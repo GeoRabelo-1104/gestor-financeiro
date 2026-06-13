@@ -3,12 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="./assets/icon_32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="./assets/icon_16.png">
-<link rel="apple-touch-icon" sizes="192x192" href="./assets/icon_192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="./assets/icon_512.png">
-<meta name="theme-color" content="#6C5CE7">
 <title>Finanças do Casal 💑</title>
 <style>
   :root {
@@ -362,8 +356,9 @@ function catById(id){ return CATEGORIES.find(c=>c.id===id)||CATEGORIES[CATEGORIE
 // ─── STATE ────────────────────────────────────────────────────────
 const now = new Date();
 let state = { user:'vitoria', year:now.getFullYear(), month:now.getMonth(), filterCat:'all' };
-let monthData = null;   // live data for current month
-let dbListener = null;  // active Firebase listener
+let monthData = null;
+let activeRef = null;
+let activeCallback = null;
 
 function monthKey(){ return `${state.year}_${MONTH_KEYS[state.month]}`; }
 function dbPath()  { return `financas/${monthKey()}`; }
@@ -375,20 +370,27 @@ const DEFAULT_MONTH = () => ({
 
 // ─── FIREBASE REALTIME LISTENER ───────────────────────────────────
 function attachListener(){
-  if(dbListener) dbListener();           // detach previous
+  // Desanexar listener anterior corretamente
+  if(activeRef && activeCallback){
+    activeRef.off('value', activeCallback);
+  }
+  activeRef = null;
+  activeCallback = null;
+  monthData = null;
   setSyncStatus('syncing');
+  render(); // mostra loading enquanto aguarda Firebase
 
-  const ref = db.ref(dbPath());
-  dbListener = ref.on('value', snap => {
+  activeRef = db.ref(dbPath());
+  activeCallback = function(snap){
     monthData = snap.val() || DEFAULT_MONTH();
-    // normalise expenses to objects if missing
     ['vitoria','geo'].forEach(u=>{
       if(!monthData[u]) monthData[u] = DEFAULT_MONTH()[u];
       if(!monthData[u].expenses) monthData[u].expenses = {};
     });
     setSyncStatus('ok');
     render();
-  }, err => {
+  };
+  activeRef.on('value', activeCallback, function(err){
     console.error(err);
     setSyncStatus('error');
     showToast('⚠️ Erro de conexão com Firebase');
@@ -590,13 +592,13 @@ function switchUser(u){ state.user=u; state.filterCat='all'; render(); }
 function filterCat(c){ state.filterCat=c; render(); }
 function prevMonth(){
   state.month--; if(state.month<0){state.month=11;state.year--;}
-  state.filterCat='all'; monthData=null;
-  render(); attachListener();
+  state.filterCat='all';
+  attachListener();
 }
 function nextMonth(){
   state.month++; if(state.month>11){state.month=0;state.year++;}
-  state.filterCat='all'; monthData=null;
-  render(); attachListener();
+  state.filterCat='all';
+  attachListener();
 }
 
 // ─── SALARY INLINE ────────────────────────────────────────────────
