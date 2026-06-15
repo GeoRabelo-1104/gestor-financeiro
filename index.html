@@ -185,9 +185,15 @@
   .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 
   /* FAB */
-  .fab { position: fixed; bottom: 24px; right: 20px; background: linear-gradient(135deg, #6C5CE7, #a29bfe); color: white; border: none; border-radius: 20px; width: 58px; height: 58px; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 24px rgba(108,92,231,0.4); transition: all 0.2s; z-index: 150; }
+  .fab { position: fixed; bottom: 24px; right: 20px; background: linear-gradient(135deg, #6C5CE7, #a29bfe); color: white; border: none; border-radius: 20px; width: 58px; height: 58px; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 24px rgba(108,92,231,0.4); transition: all 0.3s; z-index: 150; }
   .fab:hover { transform: scale(1.08); }
   .fab:active { transform: scale(0.95); }
+  .fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.7) translateY(20px); }
+
+  /* PARCELA FIELDS */
+  .parcel-section { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 14px; border: 1px solid var(--primary-light); }
+  .parcel-section .form-label { color: var(--primary); }
+  .recap-badge { display:inline-block; background:#e8f8f2; color:var(--success); font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; margin-top:6px; }
 
   /* TOAST */
   .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: white; padding: 12px 24px; border-radius: 24px; font-size: 14px; font-weight: 600; z-index: 999; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; }
@@ -290,14 +296,41 @@
           </select>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Pagamento</label>
-          <input type="text" class="form-input" id="f-payment" placeholder="PIX, Nubank...">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Parcela</label>
-          <input type="text" class="form-input" id="f-parcel" placeholder="Ex: 2/6">
+      <div class="form-group">
+        <label class="form-label">Pagamento</label>
+        <input type="text" class="form-input" id="f-payment" placeholder="PIX, Nubank...">
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">É parcelado?</span>
+        <label class="toggle"><input type="checkbox" id="f-is-parcel" onchange="toggleParcelFields()"><span class="toggle-slider"></span></label>
+      </div>
+      <div id="parcel-fields" style="display:none">
+        <div class="parcel-section">
+          <label class="form-label">⚙️ Configurar parcelas</label>
+          <div class="form-row" style="margin-bottom:10px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Parcela atual</label>
+              <input type="number" class="form-input" id="f-parcel-cur" placeholder="Ex: 1" min="1" value="1" oninput="updateParcelPreview()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Total de parcelas</label>
+              <input type="number" class="form-input" id="f-parcel-total" placeholder="Ex: 6" min="1" value="6" oninput="updateParcelPreview()">
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Vence todo dia</label>
+              <select class="form-select" id="f-parcel-venc" onchange="updateParcelPreview()">
+                <option value="20">Dia 20</option>
+                <option value="05">Dia 05</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Mês inicial</label>
+              <select class="form-select" id="f-parcel-month" onchange="updateParcelPreview()"></select>
+            </div>
+          </div>
+          <div id="parcel-preview" class="recap-badge"></div>
         </div>
       </div>
       <div class="toggle-row">
@@ -579,7 +612,7 @@ function renderExpense(e){
       <div class="expense-desc">${escHtml(e.desc||cat.label)}</div>
       <div class="expense-meta">
         <span>${cat.label}</span>
-        ${e.parcel?`<span class="parcel">${escHtml(e.parcel)}</span>`:''}
+        ${e.parcelGroup?`<span class="parcel">${e.parcelCur}/${e.parcelTotal}</span>`:''}
         ${e.paid?'<span class="paid-badge">Pago</span>':'<span class="unpaid-badge">A pagar</span>'}
       </div>
     </div>
@@ -632,8 +665,12 @@ function openAddModal(){
   document.getElementById('btn-delete').style.display='none';
   document.getElementById('btn-save-exp').disabled=false;
   document.getElementById('btn-save-exp').textContent='💾 Salvar';
+  document.getElementById('parcel-fields').style.display='none';
+  populateMonthSelect(state.year, state.month);
   selCat='casa'; renderCatPicker(); updateUBtns();
   document.getElementById('modal-overlay').classList.add('open');
+  // Scroll modal to top
+  document.querySelector('#modal-overlay .modal').scrollTop=0;
 }
 
 function openEdit(id, owner){
@@ -647,14 +684,32 @@ function openEdit(id, owner){
   document.getElementById('f-value').value=exp.value||'';
   document.getElementById('f-venc').value=exp.venc||'20';
   document.getElementById('f-payment').value=exp.payment||'';
-  document.getElementById('f-parcel').value=exp.parcel||'';
   document.getElementById('f-paid').checked=!!exp.paid;
+  // Parcela
+  const isParcel = !!exp.parcelGroup;
+  document.getElementById('f-is-parcel').checked=isParcel;
+  populateMonthSelect(state.year, state.month);
+  if(isParcel){
+    document.getElementById('parcel-fields').style.display='block';
+    document.getElementById('f-parcel-cur').value=exp.parcelCur||1;
+    document.getElementById('f-parcel-total').value=exp.parcelTotal||1;
+    document.getElementById('f-parcel-venc').value=exp.venc||'20';
+    // set month select to exp month
+    const sel=document.getElementById('f-parcel-month');
+    for(let i=0;i<sel.options.length;i++){
+      if(sel.options[i].value===exp.parcelStartKey){ sel.selectedIndex=i; break; }
+    }
+    updateParcelPreview();
+  } else {
+    document.getElementById('parcel-fields').style.display='none';
+  }
   selCat=exp.cat||'outros';
   document.getElementById('btn-delete').style.display='block';
   document.getElementById('btn-save-exp').disabled=false;
   document.getElementById('btn-save-exp').textContent='💾 Salvar';
   renderCatPicker(); updateUBtns();
   document.getElementById('modal-overlay').classList.add('open');
+  document.querySelector('#modal-overlay .modal').scrollTop=0;
 }
 
 function renderCatPicker(){
@@ -677,30 +732,76 @@ function saveExpense(ev){
   const btn=document.getElementById('btn-save-exp');
   btn.disabled=true; btn.textContent='⏳ Salvando...';
   const editId=document.getElementById('edit-id').value;
-  const id=editId||uid();
-  const expense={
-    id, _owner:formUser,
-    cat:selCat,
-    desc:document.getElementById('f-desc').value.trim(),
-    value:parseFloat(document.getElementById('f-value').value)||0,
-    venc:document.getElementById('f-venc').value,
-    payment:document.getElementById('f-payment').value.trim(),
-    parcel:document.getElementById('f-parcel').value.trim(),
-    paid:document.getElementById('f-paid').checked,
-  };
+  const isParcel=document.getElementById('f-is-parcel').checked;
+  const baseDesc=document.getElementById('f-desc').value.trim();
+  const baseValue=parseFloat(document.getElementById('f-value').value)||0;
+  const payment=document.getElementById('f-payment').value.trim();
+  const paid=document.getElementById('f-paid').checked;
 
-  // If editing and user changed → delete from old owner
-  const promises=[];
+  const updates={}; // Firebase multi-path update
+
+  // Apagar lançamento antigo se editando
   if(editId){
     ['vitoria','geo'].forEach(u=>{
       if((monthData[u]?.expenses||{})[editId])
-        promises.push(db.ref(`${dbPath()}/${u}/expenses/${editId}`).remove());
+        updates[`financas/${monthKey()}/${u}/expenses/${editId}`]=null;
     });
   }
-  Promise.all(promises)
-    .then(()=>db.ref(`${dbPath()}/${formUser}/expenses/${id}`).set(expense))
-    .then(()=>{ document.getElementById('modal-overlay').classList.remove('open'); showToast(editId?'✅ Atualizado!':'✅ Adicionado!'); })
-    .catch(()=>{ btn.disabled=false; btn.textContent='💾 Salvar'; showToast('⚠️ Erro ao salvar'); });
+
+  if(!isParcel){
+    // Lançamento simples
+    const venc=document.getElementById('f-venc').value;
+    const id=editId||uid();
+    const expense={
+      id, _owner:formUser, cat:selCat,
+      desc:baseDesc, value:baseValue, venc, payment, paid,
+      parcelGroup:null
+    };
+    updates[`financas/${monthKey()}/${formUser}/expenses/${id}`]=expense;
+  } else {
+    // Parcelado: criar uma entrada por mês
+    const cur=parseInt(document.getElementById('f-parcel-cur').value)||1;
+    const total=parseInt(document.getElementById('f-parcel-total').value)||1;
+    const venc=document.getElementById('f-parcel-venc').value;
+    const startKey=document.getElementById('f-parcel-month').value; // "2025_jun"
+    const groupId=editId||uid(); // mesmo groupId para todas as parcelas do grupo
+
+    // Calcular o mês/ano de início a partir do startKey
+    const [sy,smk]=startKey.split('_');
+    let startYear=parseInt(sy);
+    let startMonth=MONTH_KEYS.indexOf(smk);
+
+    // Parcelas restantes a partir da atual (cur)
+    const remaining=total-cur+1;
+    for(let i=0;i<remaining;i++){
+      const pNum=cur+i;
+      const mIdx=(startMonth+i)%12;
+      const mYear=startYear+Math.floor((startMonth+i)/12);
+      const mk=`${mYear}_${MONTH_KEYS[mIdx]}`;
+      const eid=uid();
+      const expense={
+        id:eid, _owner:formUser, cat:selCat,
+        desc:baseDesc,
+        value:baseValue,
+        venc,
+        payment,
+        paid: i===0 ? paid : false,
+        parcelGroup:groupId,
+        parcelCur:pNum,
+        parcelTotal:total,
+        parcelStartKey:startKey,
+      };
+      updates[`financas/${mk}/${formUser}/expenses/${eid}`]=expense;
+    }
+  }
+
+  db.ref().update(updates)
+    .then(()=>{
+      document.getElementById('modal-overlay').classList.remove('open');
+      const msg=isParcel?`✅ ${parseInt(document.getElementById('f-parcel-total').value)-parseInt(document.getElementById('f-parcel-cur').value)+1} parcelas lançadas!`:(editId?'✅ Atualizado!':'✅ Adicionado!');
+      showToast(msg);
+    })
+    .catch(err=>{ console.error(err); btn.disabled=false; btn.textContent='💾 Salvar'; showToast('⚠️ Erro ao salvar'); });
 }
 
 function deleteExpense(){
@@ -738,7 +839,53 @@ function saveSalaries(){
     .finally(()=>{ btn.disabled=false; btn.textContent='Salvar'; });
 }
 
+// ─── PARCEL HELPERS ───────────────────────────────────────────────
+function toggleParcelFields(){
+  const on=document.getElementById('f-is-parcel').checked;
+  document.getElementById('parcel-fields').style.display=on?'block':'none';
+  if(on) updateParcelPreview();
+}
+
+function populateMonthSelect(year, month){
+  const sel=document.getElementById('f-parcel-month');
+  if(!sel) return;
+  sel.innerHTML='';
+  // Mostrar 24 meses: 12 passados + 12 futuros
+  for(let i=-12;i<=24;i++){
+    let m=(month+i)%12; if(m<0) m+=12;
+    const y=year+Math.floor((month+i)/12);
+    const key=`${y}_${MONTH_KEYS[m]}`;
+    const opt=document.createElement('option');
+    opt.value=key;
+    opt.textContent=`${MONTHS[m]} ${y}`;
+    if(i===0) opt.selected=true;
+    sel.appendChild(opt);
+  }
+}
+
+function updateParcelPreview(){
+  const cur=parseInt(document.getElementById('f-parcel-cur').value)||1;
+  const total=parseInt(document.getElementById('f-parcel-total').value)||1;
+  const remaining=total-cur+1;
+  const el=document.getElementById('parcel-preview');
+  if(!el) return;
+  if(remaining<=0){ el.textContent='⚠️ Parcela atual maior que o total'; return; }
+  el.textContent=`✔ ${remaining} parcelas serão lançadas (${cur}/${total} até ${total}/${total})`;
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────
+
+// FAB scroll hide
+let lastScrollY = 0;
+window.addEventListener('scroll', () => {
+  const fab = document.querySelector('.fab');
+  if (!fab) return;
+  const sy = window.scrollY;
+  if (sy > lastScrollY + 10) fab.classList.add('hidden');
+  else if (sy < lastScrollY - 10) fab.classList.remove('hidden');
+  lastScrollY = sy;
+}, { passive: true });
+
 attachListener();
 </script>
 </body>
