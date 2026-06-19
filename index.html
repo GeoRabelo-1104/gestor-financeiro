@@ -264,6 +264,8 @@
     <div class="modal-title" id="modal-title">➕ Novo lançamento</div>
     <form id="expense-form" onsubmit="saveExpense(event)">
       <input type="hidden" id="edit-id">
+      <input type="hidden" id="edit-month-key">
+      <input type="hidden" id="edit-parcel-group">
       <div class="form-group">
         <label class="form-label">Usuário</label>
         <div style="display:flex;gap:10px">
@@ -338,7 +340,8 @@
         <label class="toggle"><input type="checkbox" id="f-paid"><span class="toggle-slider"></span></label>
       </div>
       <button type="submit" class="btn-save" id="btn-save-exp">💾 Salvar</button>
-      <button type="button" class="btn-delete" id="btn-delete" onclick="deleteExpense()" style="display:none">🗑 Excluir lançamento</button>
+      <button type="button" class="btn-delete" id="btn-delete" onclick="deleteExpense('single')" style="display:none">🗑 Excluir este mês</button>
+      <button type="button" class="btn-delete" id="btn-delete-group" onclick="deleteExpense('group')" style="display:none;border-color:#faa;color:#c0392b;margin-top:4px">🗑🗑 Excluir todas as parcelas</button>
     </form>
   </div>
 </div>
@@ -660,9 +663,12 @@ let selCat='casa', formUser='vitoria';
 function openAddModal(){
   formUser=state.user;
   document.getElementById('edit-id').value='';
+  document.getElementById('edit-month-key').value='';
+  document.getElementById('edit-parcel-group').value='';
   document.getElementById('modal-title').textContent='➕ Novo lançamento';
   document.getElementById('expense-form').reset();
   document.getElementById('btn-delete').style.display='none';
+  document.getElementById('btn-delete-group').style.display='none';
   document.getElementById('btn-save-exp').disabled=false;
   document.getElementById('btn-save-exp').textContent='💾 Salvar';
   document.getElementById('parcel-fields').style.display='none';
@@ -679,6 +685,8 @@ function openEdit(id, owner){
   if(!exp) return;
   formUser=u;
   document.getElementById('edit-id').value=id;
+  document.getElementById('edit-month-key').value=monthKey();
+  document.getElementById('edit-parcel-group').value=exp.parcelGroup||'';
   document.getElementById('modal-title').textContent='✏️ Editar lançamento';
   document.getElementById('f-desc').value=exp.desc||'';
   document.getElementById('f-value').value=exp.value||'';
@@ -705,6 +713,8 @@ function openEdit(id, owner){
   }
   selCat=exp.cat||'outros';
   document.getElementById('btn-delete').style.display='block';
+  document.getElementById('btn-delete').textContent = isParcel ? '🗑 Excluir só este mês' : '🗑 Excluir lançamento';
+  document.getElementById('btn-delete-group').style.display = isParcel ? 'block' : 'none';
   document.getElementById('btn-save-exp').disabled=false;
   document.getElementById('btn-save-exp').textContent='💾 Salvar';
   renderCatPicker(); updateUBtns();
@@ -732,6 +742,8 @@ function saveExpense(ev){
   const btn=document.getElementById('btn-save-exp');
   btn.disabled=true; btn.textContent='⏳ Salvando...';
   const editId=document.getElementById('edit-id').value;
+  const editMonthKey=document.getElementById('edit-month-key').value;
+  const editParcelGroup=document.getElementById('edit-parcel-group').value;
   const isParcel=document.getElementById('f-is-parcel').checked;
   const baseDesc=document.getElementById('f-desc').value.trim();
   const baseValue=parseFloat(document.getElementById('f-value').value)||0;
@@ -740,16 +752,15 @@ function saveExpense(ev){
 
   const updates={}; // Firebase multi-path update
 
-  // Apagar lançamento antigo se editando
-  if(editId){
-    ['vitoria','geo'].forEach(u=>{
-      if((monthData[u]?.expenses||{})[editId])
-        updates[`financas/${monthKey()}/${u}/expenses/${editId}`]=null;
-    });
-  }
-
   if(!isParcel){
-    // Lançamento simples
+    // ── Lançamento simples ──────────────────────────────────────────
+    // Se editando parcelado → remove o registro antigo pelo mês correto
+    if(editId && editMonthKey){
+      ['vitoria','geo'].forEach(u=>{
+        if((monthData[u]?.expenses||{})[editId])
+          updates[`financas/${editMonthKey}/${u}/expenses/${editId}`]=null;
+      });
+    }
     const venc=document.getElementById('f-venc').value;
     const id=editId||uid();
     const expense={
@@ -758,20 +769,37 @@ function saveExpense(ev){
       parcelGroup:null
     };
     updates[`financas/${monthKey()}/${formUser}/expenses/${id}`]=expense;
+
+  } else if(editId && editParcelGroup){
+    // ── Editar parcela individual já existente ──────────────────────
+    // Atualiza APENAS este registro, no mês onde ele vive, preservando id e parcelGroup
+    const venc=document.getElementById('f-parcel-venc').value;
+    const cur=parseInt(document.getElementById('f-parcel-cur').value)||1;
+    const total=parseInt(document.getElementById('f-parcel-total').value)||1;
+    const startKey=document.getElementById('f-parcel-month').value;
+    const expense={
+      id:editId, _owner:formUser, cat:selCat,
+      desc:baseDesc, value:baseValue,
+      venc, payment, paid,
+      parcelGroup:editParcelGroup,
+      parcelCur:cur,
+      parcelTotal:total,
+      parcelStartKey:startKey,
+    };
+    updates[`financas/${editMonthKey}/${formUser}/expenses/${editId}`]=expense;
+
   } else {
-    // Parcelado: criar uma entrada por mês
+    // ── Novo parcelado: criar uma entrada por mês ───────────────────
     const cur=parseInt(document.getElementById('f-parcel-cur').value)||1;
     const total=parseInt(document.getElementById('f-parcel-total').value)||1;
     const venc=document.getElementById('f-parcel-venc').value;
-    const startKey=document.getElementById('f-parcel-month').value; // "2025_jun"
-    const groupId=editId||uid(); // mesmo groupId para todas as parcelas do grupo
+    const startKey=document.getElementById('f-parcel-month').value;
+    const groupId=uid(); // novo groupId para o grupo
 
-    // Calcular o mês/ano de início a partir do startKey
     const [sy,smk]=startKey.split('_');
     let startYear=parseInt(sy);
     let startMonth=MONTH_KEYS.indexOf(smk);
 
-    // Parcelas restantes a partir da atual (cur)
     const remaining=total-cur+1;
     for(let i=0;i<remaining;i++){
       const pNum=cur+i;
@@ -798,20 +826,58 @@ function saveExpense(ev){
   db.ref().update(updates)
     .then(()=>{
       document.getElementById('modal-overlay').classList.remove('open');
-      const msg=isParcel?`✅ ${parseInt(document.getElementById('f-parcel-total').value)-parseInt(document.getElementById('f-parcel-cur').value)+1} parcelas lançadas!`:(editId?'✅ Atualizado!':'✅ Adicionado!');
+      let msg;
+      if(!isParcel){
+        msg = editId ? '✅ Atualizado!' : '✅ Adicionado!';
+      } else if(editId && editParcelGroup){
+        msg = '✅ Parcela atualizada!';
+      } else {
+        const total=parseInt(document.getElementById('f-parcel-total').value);
+        const cur=parseInt(document.getElementById('f-parcel-cur').value);
+        msg = `✅ ${total-cur+1} parcelas lançadas!`;
+      }
       showToast(msg);
     })
     .catch(err=>{ console.error(err); btn.disabled=false; btn.textContent='💾 Salvar'; showToast('⚠️ Erro ao salvar'); });
 }
 
-function deleteExpense(){
-  if(!confirm('Excluir este lançamento?')) return;
-  const id=document.getElementById('edit-id').value;
-  const deletes=['vitoria','geo'].filter(u=>(monthData[u]?.expenses||{})[id])
-    .map(u=>db.ref(`${dbPath()}/${u}/expenses/${id}`).remove());
-  Promise.all(deletes)
-    .then(()=>{ document.getElementById('modal-overlay').classList.remove('open'); showToast('🗑 Excluído!'); })
+function deleteExpense(mode){
+  const id          = document.getElementById('edit-id').value;
+  const editMonthKey= document.getElementById('edit-month-key').value;
+  const groupId     = document.getElementById('edit-parcel-group').value;
+
+  if(mode==='group' && groupId){
+    if(!confirm('Excluir TODAS as parcelas deste grupo?\nIsso removerá os lançamentos em todos os meses.')) return;
+
+    // Busca todos os meses no Firebase que tenham entradas com este parcelGroup
+    db.ref('financas').once('value').then(snap=>{
+      const allData = snap.val()||{};
+      const updates = {};
+      Object.entries(allData).forEach(([mk, mData])=>{
+        ['vitoria','geo'].forEach(u=>{
+          const exps = mData?.[u]?.expenses||{};
+          Object.entries(exps).forEach(([eid, exp])=>{
+            if(exp && exp.parcelGroup === groupId){
+              updates[`financas/${mk}/${u}/expenses/${eid}`] = null;
+            }
+          });
+        });
+      });
+      return db.ref().update(updates);
+    })
+    .then(()=>{ document.getElementById('modal-overlay').classList.remove('open'); showToast('🗑 Todas as parcelas excluídas!'); })
     .catch(()=>showToast('⚠️ Erro ao excluir'));
+
+  } else {
+    if(!confirm('Excluir apenas este lançamento?')) return;
+    const mk = editMonthKey || monthKey();
+    const deletes = ['vitoria','geo']
+      .filter(u=>(monthData[u]?.expenses||{})[id])
+      .map(u=>db.ref(`financas/${mk}/${u}/expenses/${id}`).remove());
+    Promise.all(deletes)
+      .then(()=>{ document.getElementById('modal-overlay').classList.remove('open'); showToast('🗑 Excluído!'); })
+      .catch(()=>showToast('⚠️ Erro ao excluir'));
+  }
 }
 
 // ─── SALARY MODAL ─────────────────────────────────────────────────
