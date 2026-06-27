@@ -206,6 +206,50 @@
   .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* NAV TABS (main navigation) */
+  .nav-tabs { display: flex; margin: 0 20px; background: rgba(0,0,0,0.12); border-radius: 0; overflow: hidden; border-bottom: none; }
+  .nav-tab { flex: 1; padding: 9px 8px; border: none; background: transparent; color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; letter-spacing: 0.3px; text-transform: uppercase; }
+  .nav-tab.active { background: rgba(255,255,255,0.18); color: white; border-bottom: 2px solid white; }
+  .nav-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
+
+  /* CARD SCREEN */
+  .card-list-grid { display: flex; flex-direction: column; gap: 16px; }
+  .cartao-block { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow: hidden; }
+  .cartao-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, #2d3436 0%, #636e72 100%); color: white; cursor: pointer; }
+  .cartao-chip { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; font-size: 20px; }
+  .cartao-info { flex: 1; }
+  .cartao-name { font-size: 15px; font-weight: 700; }
+  .cartao-meta { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  .cartao-total { font-size: 16px; font-weight: 700; text-align: right; }
+  .cartao-total-label { font-size: 10px; opacity: 0.7; text-align: right; }
+  .cartao-actions { display: flex; gap: 6px; padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .btn-cartao-action { flex: 1; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.2s; }
+  .btn-cartao-action:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-cartao-action.danger { color: var(--danger); }
+  .btn-cartao-action.danger:hover { border-color: var(--danger); background: #fff5f5; }
+  .cartao-despesas { }
+  .cartao-despesa-item { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+  .cartao-despesa-item:last-child { border-bottom: none; }
+  .cartao-despesa-item:hover { background: var(--surface2); }
+  .cd-user-dot { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .cd-user-dot.vitoria { background: #fde8f1; }
+  .cd-user-dot.geo { background: #e8f4ff; }
+  .cd-user-dot.nenhum { background: var(--surface2); }
+  .cd-info { flex: 1; min-width: 0; }
+  .cd-desc { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cd-meta { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; gap: 8px; }
+  .cd-right { text-align: right; flex-shrink: 0; }
+  .cd-value { font-size: 14px; font-weight: 700; color: var(--text); }
+  .cd-venc { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .cd-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--surface2); color: var(--primary); }
+  .empty-cartao { padding: 24px; text-align: center; color: var(--text3); font-size: 13px; }
+  .new-cartao-btn { background: var(--surface); border: 2px dashed var(--primary-light); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; color: var(--primary); font-weight: 700; font-size: 14px; transition: all 0.2s; }
+  .new-cartao-btn:hover { background: var(--surface2); border-color: var(--primary); }
+  .cartao-summary-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .cartao-sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow-sm); }
+  .cartao-sum-card .cslabel { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .cartao-sum-card .csval { font-size: 20px; font-weight: 700; color: var(--text); }
+
   /* RESPONSIVE */
   @media (min-width: 600px) {
     .main { padding: 24px; }
@@ -233,7 +277,11 @@
       <button class="btn-icon" onclick="showSalaryModal()" title="Salários">💰</button>
     </div>
   </div>
-  <div class="user-tabs">
+  <div class="nav-tabs" id="nav-tabs">
+    <button class="nav-tab active" id="navtab-home" onclick="switchScreen('home')">🏠 Início</button>
+    <button class="nav-tab" id="navtab-cards" onclick="switchScreen('cards')">💳 Cartões</button>
+  </div>
+  <div class="user-tabs" id="user-tabs-row">
     <button class="user-tab vitoria active" onclick="switchUser('vitoria')">
       <span class="dot"></span> Vitória
     </button>
@@ -241,7 +289,7 @@
       <span class="dot"></span> Geovanne
     </button>
   </div>
-  <div class="month-nav">
+  <div class="month-nav" id="month-nav-row">
     <button class="month-btn" onclick="prevMonth()">‹</button>
     <span class="month-label" id="month-label">—</span>
     <button class="month-btn" onclick="nextMonth()">›</button>
@@ -346,7 +394,122 @@
   </div>
 </div>
 
-<!-- Salary Modal -->
+<!-- New Card Modal -->
+<div class="modal-overlay" id="new-cartao-modal" onclick="handleOverlayClick(event,'new-cartao-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="new-cartao-title">💳 Novo Cartão</div>
+    <input type="hidden" id="edit-cartao-id">
+    <div class="form-group">
+      <label class="form-label">Nome do cartão</label>
+      <input type="text" class="form-input" id="nc-name" placeholder="Ex: Nubank Vitória, Inter Geo...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Emoji / Ícone</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="nc-emoji-picker">
+        <button type="button" class="cat-btn selected" onclick="selectCartaoEmoji('💜')" style="width:44px;padding:8px">💜</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('💳')" style="width:44px;padding:8px">💳</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('🏦')" style="width:44px;padding:8px">🏦</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('💚')" style="width:44px;padding:8px">💚</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('🧡')" style="width:44px;padding:8px">🧡</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('💙')" style="width:44px;padding:8px">💙</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('🔴')" style="width:44px;padding:8px">🔴</button>
+        <button type="button" class="cat-btn" onclick="selectCartaoEmoji('⭐')" style="width:44px;padding:8px">⭐</button>
+      </div>
+    </div>
+    <button class="btn-save" onclick="saveNovoCartao()">💾 Salvar cartão</button>
+    <button class="btn-delete" id="btn-delete-cartao" onclick="deleteCartao()" style="display:none">🗑 Excluir cartão</button>
+  </div>
+</div>
+
+<!-- Card Expense Modal -->
+<div class="modal-overlay" id="cartao-despesa-modal" onclick="handleOverlayClick(event,'cartao-despesa-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="cartao-despesa-title">➕ Nova despesa no cartão</div>
+    <input type="hidden" id="cd-edit-id">
+    <input type="hidden" id="cd-cartao-id">
+    <div class="form-group">
+      <label class="form-label">Responsável</label>
+      <div style="display:flex;gap:10px">
+        <button type="button" class="cat-btn" id="cd-ubtn-vitoria" onclick="selectCdUser('vitoria')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+          <span class="emoji">👩</span>Vitória
+        </button>
+        <button type="button" class="cat-btn" id="cd-ubtn-geo" onclick="selectCdUser('geo')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+          <span class="emoji">👨</span>Geovanne
+        </button>
+        <button type="button" class="cat-btn" id="cd-ubtn-nenhum" onclick="selectCdUser('nenhum')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+          <span class="emoji">👥</span>Casal
+        </button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <input type="text" class="form-input" id="cd-desc" placeholder="Ex: Mercado, Assinatura, Roupa...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor (R$)</label>
+        <input type="number" class="form-input" id="cd-value" placeholder="0,00" step="0.01" min="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data da compra</label>
+        <input type="date" class="form-input" id="cd-date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Vencimento da fatura</label>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Dia</label>
+          <select class="form-select" id="cd-venc">
+            <option value="01">Dia 01</option>
+            <option value="05">Dia 05</option>
+            <option value="10">Dia 10</option>
+            <option value="15">Dia 15</option>
+            <option value="20">Dia 20</option>
+            <option value="25">Dia 25</option>
+            <option value="ultimo">Último dia</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0" id="cd-venc-month-row">
+          <label class="form-label">Mês da fatura</label>
+          <select class="form-select" id="cd-venc-month"></select>
+        </div>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">É parcelado?</span>
+      <label class="toggle"><input type="checkbox" id="cd-is-parcel" onchange="toggleCdParcelFields()"><span class="toggle-slider"></span></label>
+    </div>
+    <div id="cd-parcel-fields" style="display:none">
+      <div class="parcel-section">
+        <label class="form-label">⚙️ Configurar parcelas</label>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Parcela atual</label>
+            <input type="number" class="form-input" id="cd-parcel-cur" placeholder="Ex: 1" min="1" value="1" oninput="updateCdParcelPreview()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Total de parcelas</label>
+            <input type="number" class="form-input" id="cd-parcel-total" placeholder="Ex: 6" min="1" value="6" oninput="updateCdParcelPreview()">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Mês inicial da cobrança</label>
+          <select class="form-select" id="cd-parcel-month" onchange="updateCdParcelPreview()"></select>
+        </div>
+        <div id="cd-parcel-preview" class="recap-badge"></div>
+      </div>
+    </div>
+    <input type="hidden" id="cd-parcel-group">
+    <button class="btn-save" onclick="saveCartaoDespesa()">💾 Salvar</button>
+    <button class="btn-delete" id="btn-delete-cd" onclick="deleteCartaoDespesaModal()" style="display:none">🗑 Excluir só esta parcela</button>
+    <button class="btn-delete" id="btn-delete-cd-group" onclick="deleteCartaoDespesaGroup()" style="display:none;border-color:#faa;color:#c0392b;margin-top:4px">🗑🗑 Excluir todas as parcelas</button>
+  </div>
+</div>
+
+
 <div class="modal-overlay" id="salary-modal-overlay" onclick="handleOverlayClick(event,'salary-modal-overlay')">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -390,6 +553,7 @@ const CATEGORIES = [
   { id:'dividas',     emoji:'💳', label:'Dívidas',     color:'#d63031' },
   { id:'educacao',    emoji:'📚', label:'Educação',    color:'#fdcb6e' },
   { id:'diversao',    emoji:'🎉', label:'Diversão',    color:'#e84393' },
+  { id:'cartao',      emoji:'💳', label:'Cartão',      color:'#6c5ce7' },
   { id:'outros',      emoji:'📦', label:'Outros',      color:'#b2bec3' },
 ];
 function catById(id){ return CATEGORIES.find(c=>c.id===id)||CATEGORIES[CATEGORIES.length-1]; }
@@ -939,6 +1103,546 @@ function updateParcelPreview(){
   el.textContent=`✔ ${remaining} parcelas serão lançadas (${cur}/${total} até ${total}/${total})`;
 }
 
+// ─── SCREEN STATE ─────────────────────────────────────────────────
+let currentScreen = 'home'; // 'home' | 'cards'
+let cartoesData = {};
+let cartoesRef = null;
+let cartoesCallback = null;
+let selectedCartaoEmoji = '💜';
+let cdUser = 'nenhum';
+
+function switchScreen(screen) {
+  currentScreen = screen;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('navtab-' + (screen === 'home' ? 'home' : 'cards')).classList.add('active');
+
+  const userTabsRow = document.getElementById('user-tabs-row');
+  const monthNavRow = document.getElementById('month-nav-row');
+  const fab = document.querySelector('.fab');
+
+  if (screen === 'home') {
+    userTabsRow.style.display = '';
+    monthNavRow.style.display = '';
+    fab.style.display = '';
+    attachListener();
+  } else {
+    userTabsRow.style.display = 'none';
+    monthNavRow.style.display = 'none';
+    fab.style.display = 'none';
+    attachCartoesListener();
+    renderCartoes();
+  }
+}
+
+function attachCartoesListener() {
+  if (cartoesRef && cartoesCallback) {
+    cartoesRef.off('value', cartoesCallback);
+  }
+  cartoesRef = db.ref('cartoes');
+  cartoesCallback = function(snap) {
+    cartoesData = snap.val() || {};
+    if (currentScreen === 'cards') renderCartoes();
+    // Also re-render home if open to reflect card totals
+    if (currentScreen === 'home' && monthData) render();
+  };
+  cartoesRef.on('value', cartoesCallback);
+}
+
+function renderCartoes() {
+  const main = document.getElementById('main-content');
+  const cartaoList = Object.entries(cartoesData);
+
+  // Totais gerais
+  let totalGeral = 0;
+  let totalVitoria = 0;
+  let totalGeo = 0;
+  cartaoList.forEach(([cid, c]) => {
+    Object.values(c.despesas || {}).forEach(d => {
+      const v = Number(d.value || 0);
+      totalGeral += v;
+      if (d.responsavel === 'vitoria') totalVitoria += v;
+      else if (d.responsavel === 'geo') totalGeo += v;
+    });
+  });
+
+  let h = `
+  <div class="cartao-summary-bar">
+    <div class="cartao-sum-card"><div class="cslabel">💳 Total em cartões</div><div class="csval">${fmt(totalGeral)}</div></div>
+    <div class="cartao-sum-card"><div class="cslabel">👥 Dos usuários</div><div class="csval">${fmt(totalVitoria + totalGeo)}</div></div>
+  </div>
+  <div class="card-list-grid">`;
+
+  if (!cartaoList.length) {
+    h += `<div class="empty-state"><div class="icon">💳</div><p>Nenhum cartão cadastrado ainda.<br>Adicione seu primeiro cartão abaixo.</p></div>`;
+  } else {
+    cartaoList.forEach(([cid, c]) => {
+      const despesas = Object.values(c.despesas || {}).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const total = despesas.reduce((s, d) => s + Number(d.value || 0), 0);
+      h += `
+      <div class="cartao-block" id="cblock-${cid}">
+        <div class="cartao-header" onclick="toggleCartaoBlock('${cid}')">
+          <div class="cartao-chip">${escHtml(c.emoji || '💳')}</div>
+          <div class="cartao-info">
+            <div class="cartao-name">${escHtml(c.name || 'Cartão')}</div>
+            <div class="cartao-meta">${despesas.length} despesa${despesas.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div>
+            <div class="cartao-total">${fmt(total)}</div>
+            <div class="cartao-total-label">Total</div>
+          </div>
+        </div>
+        <div class="cartao-actions">
+          <button class="btn-cartao-action" onclick="openNewCartaoDespesa('${cid}')">+ Despesa</button>
+          <button class="btn-cartao-action" onclick="openEditCartao('${cid}')">✏️ Editar</button>
+          <button class="btn-cartao-action danger" onclick="confirmDeleteCartao('${cid}')">🗑 Excluir</button>
+        </div>
+        <div class="cartao-despesas" id="cdlist-${cid}">`;
+
+      if (!despesas.length) {
+        h += `<div class="empty-cartao">Nenhuma despesa ainda. Toque em "+ Despesa".</div>`;
+      } else {
+        despesas.forEach(d => {
+          const userEmoji = d.responsavel === 'vitoria' ? '👩' : d.responsavel === 'geo' ? '👨' : '👥';
+          const userLabel = d.responsavel === 'vitoria' ? 'Vitória' : d.responsavel === 'geo' ? 'Geovanne' : 'Casal';
+          const dateFormatted = d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+          h += `
+          <div class="cartao-despesa-item" onclick="openEditCartaoDespesa('${cid}','${d.id}')">
+            <div class="cd-user-dot ${d.responsavel || 'nenhum'}">${userEmoji}</div>
+            <div class="cd-info">
+              <div class="cd-desc">${escHtml(d.desc || '—')}</div>
+              <div class="cd-meta">
+                <span>${userLabel}</span>
+                <span>🛒 ${dateFormatted}</span>
+                ${d.vencMonth ? `<span>📅 Fatura: ${(()=>{ const [y,mk]=d.vencMonth.split('_'); return MONTHS[MONTH_KEYS.indexOf(mk)]+' '+y; })()}</span>` : ''}
+                ${d.parcelGroup ? `<span class="cd-badge">${d.parcelCur}/${d.parcelTotal}</span>` : ''}
+                ${d.reflectido ? '<span class="cd-badge">✓ Na tela inicial</span>' : ''}
+              </div>
+            </div>
+            <div class="cd-right">
+              <div class="cd-value">${fmt(d.value)}</div>
+              <div class="cd-venc">Dia ${escHtml(d.venc || '—')}</div>
+            </div>
+          </div>`;
+        });
+      }
+
+      h += `</div></div>`;
+    });
+  }
+
+  h += `</div>
+  <div class="new-cartao-btn" onclick="openNewCartao()" style="margin-top:16px">+ Adicionar novo cartão</div>`;
+
+  main.innerHTML = h;
+}
+
+function toggleCartaoBlock(cid) {
+  const list = document.getElementById('cdlist-' + cid);
+  if (list) list.style.display = list.style.display === 'none' ? '' : 'none';
+}
+
+// ─── NEW CARTAO MODAL ─────────────────────────────────────────────
+function openNewCartao() {
+  document.getElementById('edit-cartao-id').value = '';
+  document.getElementById('nc-name').value = '';
+  document.getElementById('new-cartao-title').textContent = '💳 Novo Cartão';
+  document.getElementById('btn-delete-cartao').style.display = 'none';
+  selectCartaoEmoji('💜');
+  document.getElementById('new-cartao-modal').classList.add('open');
+}
+
+function openEditCartao(cid) {
+  const c = cartoesData[cid];
+  if (!c) return;
+  document.getElementById('edit-cartao-id').value = cid;
+  document.getElementById('nc-name').value = c.name || '';
+  document.getElementById('new-cartao-title').textContent = '✏️ Editar Cartão';
+  document.getElementById('btn-delete-cartao').style.display = 'block';
+  selectCartaoEmoji(c.emoji || '💜');
+  document.getElementById('new-cartao-modal').classList.add('open');
+}
+
+function selectCartaoEmoji(e) {
+  selectedCartaoEmoji = e;
+  document.querySelectorAll('#nc-emoji-picker .cat-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.textContent.trim() === e);
+  });
+}
+
+function saveNovoCartao() {
+  const name = document.getElementById('nc-name').value.trim();
+  if (!name) { showToast('⚠️ Dê um nome ao cartão'); return; }
+  const editId = document.getElementById('edit-cartao-id').value;
+  const cid = editId || db.ref('cartoes').push().key;
+  const data = { name, emoji: selectedCartaoEmoji };
+  if (editId && cartoesData[editId]) data.despesas = cartoesData[editId].despesas || {};
+  db.ref('cartoes/' + cid).set(data)
+    .then(() => {
+      document.getElementById('new-cartao-modal').classList.remove('open');
+      showToast(editId ? '✅ Cartão atualizado!' : '✅ Cartão criado!');
+    })
+    .catch(() => showToast('⚠️ Erro ao salvar'));
+}
+
+function confirmDeleteCartao(cid) {
+  document.getElementById('edit-cartao-id').value = cid;
+  openEditCartao(cid);
+}
+
+function deleteCartao() {
+  const cid = document.getElementById('edit-cartao-id').value;
+  if (!cid) return;
+  const c = cartoesData[cid];
+  const hasDespesas = Object.keys(c?.despesas || {}).length > 0;
+  const msg = hasDespesas
+    ? `Excluir o cartão "${c.name}" e todas as suas ${Object.keys(c.despesas).length} despesas?`
+    : `Excluir o cartão "${c?.name}"?`;
+  if (!confirm(msg)) return;
+  db.ref('cartoes/' + cid).remove()
+    .then(() => {
+      document.getElementById('new-cartao-modal').classList.remove('open');
+      showToast('🗑 Cartão excluído!');
+    })
+    .catch(() => showToast('⚠️ Erro ao excluir'));
+}
+
+// ─── CARD EXPENSE MODAL ───────────────────────────────────────────
+function openNewCartaoDespesa(cid) {
+  document.getElementById('cd-edit-id').value = '';
+  document.getElementById('cd-cartao-id').value = cid;
+  document.getElementById('cd-parcel-group').value = '';
+  document.getElementById('cartao-despesa-title').textContent = '➕ Nova despesa no cartão';
+  document.getElementById('cd-desc').value = '';
+  document.getElementById('cd-value').value = '';
+  document.getElementById('cd-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('cd-venc').value = '05';
+  document.getElementById('cd-is-parcel').checked = false;
+  document.getElementById('cd-parcel-fields').style.display = 'none';
+  document.getElementById('cd-venc-month-row').style.display = '';
+  document.getElementById('cd-parcel-cur').value = 1;
+  document.getElementById('cd-parcel-total').value = 6;
+  document.getElementById('btn-delete-cd').style.display = 'none';
+  document.getElementById('btn-delete-cd-group').style.display = 'none';
+  cdPopulateMonthSelect(); // also fills cd-venc-month with default = next month
+  selectCdUser('nenhum');
+  document.getElementById('cartao-despesa-modal').classList.add('open');
+  document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
+}
+
+function openEditCartaoDespesa(cid, did) {
+  const d = (cartoesData[cid]?.despesas || {})[did];
+  if (!d) return;
+  document.getElementById('cd-edit-id').value = did;
+  document.getElementById('cd-cartao-id').value = cid;
+  document.getElementById('cd-parcel-group').value = d.parcelGroup || '';
+  document.getElementById('cartao-despesa-title').textContent = '✏️ Editar despesa';
+  document.getElementById('cd-desc').value = d.desc || '';
+  document.getElementById('cd-value').value = d.value || '';
+  document.getElementById('cd-date').value = d.date || '';
+  document.getElementById('cd-venc').value = d.venc || '05';
+  const isParcel = !!d.parcelGroup;
+  document.getElementById('cd-is-parcel').checked = isParcel;
+  cdPopulateMonthSelect();
+  cdPopulateVencMonth(d.vencMonth || null);
+  document.getElementById('cd-venc-month-row').style.display = isParcel ? 'none' : '';
+  if (isParcel) {
+    document.getElementById('cd-parcel-fields').style.display = 'block';
+    document.getElementById('cd-parcel-cur').value = d.parcelCur || 1;
+    document.getElementById('cd-parcel-total').value = d.parcelTotal || 1;
+    const sel = document.getElementById('cd-parcel-month');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === d.parcelStartKey) { sel.selectedIndex = i; break; }
+    }
+    updateCdParcelPreview();
+  } else {
+    document.getElementById('cd-parcel-fields').style.display = 'none';
+  }
+  document.getElementById('btn-delete-cd').style.display = 'block';
+  document.getElementById('btn-delete-cd').textContent = isParcel ? '🗑 Excluir só esta parcela' : '🗑 Excluir despesa';
+  document.getElementById('btn-delete-cd-group').style.display = isParcel ? 'block' : 'none';
+  selectCdUser(d.responsavel || 'nenhum');
+  document.getElementById('cartao-despesa-modal').classList.add('open');
+  document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
+}
+
+function selectCdUser(u) {
+  cdUser = u;
+  ['vitoria', 'geo', 'nenhum'].forEach(x => {
+    const btn = document.getElementById('cd-ubtn-' + x);
+    if (btn) btn.className = `cat-btn${cdUser === x ? ' selected' : ''}`;
+    if (btn) btn.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center';
+  });
+}
+
+// ─── CARD PARCEL HELPERS ──────────────────────────────────────────
+function cdPopulateMonthSelect() {
+  const now2 = new Date();
+  const year = now2.getFullYear();
+  const month = now2.getMonth();
+
+  // Parcel start month selector
+  const sel = document.getElementById('cd-parcel-month');
+  if (sel) {
+    sel.innerHTML = '';
+    for (let i = -12; i <= 24; i++) {
+      let m = (month + i) % 12; if (m < 0) m += 12;
+      const y = year + Math.floor((month + i) / 12);
+      const key = `${y}_${MONTH_KEYS[m]}`;
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = `${MONTHS[m]} ${y}`;
+      if (i === 0) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+
+  // Vencimento month selector (default = next month, since purchase today goes to next bill)
+  cdPopulateVencMonth();
+}
+
+function cdPopulateVencMonth(selectedKey) {
+  const sel = document.getElementById('cd-venc-month');
+  if (!sel) return;
+  const now2 = new Date();
+  const year = now2.getFullYear();
+  const month = now2.getMonth();
+  sel.innerHTML = '';
+  for (let i = -3; i <= 18; i++) {
+    let m = (month + i) % 12; if (m < 0) m += 12;
+    const y = year + Math.floor((month + i) / 12);
+    const key = `${y}_${MONTH_KEYS[m]}`;
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = `${MONTHS[m]} ${y}`;
+    // default: next month (i === 1), or match selectedKey
+    if (selectedKey ? key === selectedKey : i === 1) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function toggleCdParcelFields() {
+  const on = document.getElementById('cd-is-parcel').checked;
+  document.getElementById('cd-parcel-fields').style.display = on ? 'block' : 'none';
+  // When parceled, billing month is set per-parcel via cd-parcel-month; hide single venc-month
+  document.getElementById('cd-venc-month-row').style.display = on ? 'none' : '';
+  if (on) updateCdParcelPreview();
+}
+
+function updateCdParcelPreview() {
+  const cur = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
+  const total = parseInt(document.getElementById('cd-parcel-total').value) || 1;
+  const remaining = total - cur + 1;
+  const el = document.getElementById('cd-parcel-preview');
+  if (!el) return;
+  if (remaining <= 0) { el.textContent = '⚠️ Parcela atual maior que o total'; return; }
+  el.textContent = `✔ ${remaining} parcela${remaining !== 1 ? 's' : ''} serão lançadas (${cur}/${total} até ${total}/${total})`;
+}
+
+// Helper: given a despesa object from cartoes, build home expense mirroring it
+function buildHomeExpense(despesa, cid, cartaoName) {
+  // For the home screen, venc day is the bill day (05, 10, 20 etc.)
+  // The record lives in the financas month key = despesa.vencMonth
+  return {
+    id: despesa.id,
+    _owner: despesa.responsavel,
+    cat: 'cartao',
+    desc: `💳 ${cartaoName}: ${despesa.desc}`,
+    value: despesa.value,
+    venc: despesa.venc,         // day (05, 10, 20...)
+    vencMonth: despesa.vencMonth, // month key stored for reference
+    payment: cartaoName,
+    paid: false,
+    parcelGroup: despesa.parcelGroup || null,
+    parcelCur: despesa.parcelCur || null,
+    parcelTotal: despesa.parcelTotal || null,
+    parcelStartKey: despesa.parcelStartKey || null,
+    fromCartao: cid,
+  };
+}
+
+function saveCartaoDespesa() {
+  const desc    = document.getElementById('cd-desc').value.trim();
+  const value   = parseFloat(document.getElementById('cd-value').value) || 0;
+  const date    = document.getElementById('cd-date').value;
+  const venc    = document.getElementById('cd-venc').value;
+  const vencMonth = document.getElementById('cd-venc-month').value; // ex: "2026_jul"
+  const cid     = document.getElementById('cd-cartao-id').value;
+  const editId  = document.getElementById('cd-edit-id').value;
+  const editParcelGroup = document.getElementById('cd-parcel-group').value;
+  const isParcel = document.getElementById('cd-is-parcel').checked;
+  const cartaoName = cartoesData[cid]?.name || 'Cartão';
+
+  if (!desc)     { showToast('⚠️ Preencha a descrição'); return; }
+  if (!value)    { showToast('⚠️ Informe o valor'); return; }
+  if (!cid)      { showToast('⚠️ Cartão inválido'); return; }
+  if (!vencMonth){ showToast('⚠️ Selecione o mês da fatura'); return; }
+
+  const updates = {};
+
+  // ── Helper: remove old home mirror using stored vencMonth ─────────
+  const removeOldMirror = (oldDespesa) => {
+    if (!oldDespesa || !oldDespesa.responsavel || oldDespesa.responsavel === 'nenhum') return;
+    // Use stored vencMonth if available, fallback to date-based for legacy entries
+    const oldMk = oldDespesa.vencMonth ||
+      (oldDespesa.date
+        ? (() => { const d = new Date(oldDespesa.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })()
+        : null);
+    if (oldMk) updates[`financas/${oldMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
+  };
+
+  if (!isParcel) {
+    // ── Lançamento simples ─────────────────────────────────────────
+    if (editId && editParcelGroup) {
+      Object.values(cartoesData[cid]?.despesas || {}).forEach(d => {
+        if (d.parcelGroup === editParcelGroup) {
+          updates[`cartoes/${cid}/despesas/${d.id}`] = null;
+          removeOldMirror(d);
+        }
+      });
+    } else if (editId) {
+      const old = (cartoesData[cid]?.despesas || {})[editId];
+      if (old) removeOldMirror(old);
+    }
+
+    const did = editId || db.ref().push().key;
+    const despesa = { id: did, desc, value, date, venc, vencMonth, responsavel: cdUser, parcelGroup: null, reflectido: cdUser !== 'nenhum' };
+    updates[`cartoes/${cid}/despesas/${did}`] = despesa;
+    if (cdUser !== 'nenhum') {
+      // Mirror goes into the bill month (vencMonth), not purchase month
+      updates[`financas/${vencMonth}/${cdUser}/expenses/${did}`] = buildHomeExpense(despesa, cid, cartaoName);
+    }
+
+  } else if (editId && editParcelGroup) {
+    // ── Editar parcela individual já existente ────────────────────
+    const old = (cartoesData[cid]?.despesas || {})[editId];
+    const cur     = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
+    const total   = parseInt(document.getElementById('cd-parcel-total').value) || 1;
+    const startKey = document.getElementById('cd-parcel-month').value;
+
+    if (old) removeOldMirror(old);
+
+    const despesa = { id: editId, desc, value, date, venc, vencMonth, responsavel: cdUser, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'nenhum' };
+    updates[`cartoes/${cid}/despesas/${editId}`] = despesa;
+    if (cdUser !== 'nenhum') {
+      updates[`financas/${vencMonth}/${cdUser}/expenses/${editId}`] = buildHomeExpense(despesa, cid, cartaoName);
+    }
+
+  } else {
+    // ── Novo parcelado: criar uma entrada por mês ─────────────────
+    // For parcels the cd-parcel-month IS the first billing month
+    const cur      = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
+    const total    = parseInt(document.getElementById('cd-parcel-total').value) || 1;
+    const startKey = document.getElementById('cd-parcel-month').value; // first billing month
+    const groupId  = db.ref().push().key;
+
+    const [sy, smk] = startKey.split('_');
+    let startYear  = parseInt(sy);
+    let startMonth = MONTH_KEYS.indexOf(smk);
+    const remaining = total - cur + 1;
+
+    if (editId) {
+      const old = (cartoesData[cid]?.despesas || {})[editId];
+      if (old) { updates[`cartoes/${cid}/despesas/${editId}`] = null; removeOldMirror(old); }
+    }
+
+    for (let i = 0; i < remaining; i++) {
+      const pNum = cur + i;
+      const mIdx = (startMonth + i) % 12;
+      const mYear = startYear + Math.floor((startMonth + i) / 12);
+      const mk = `${mYear}_${MONTH_KEYS[mIdx]}`; // each parcel's billing month
+      const eid = db.ref().push().key;
+      const despesa = {
+        id: eid,
+        desc: `${desc} (${pNum}/${total})`,
+        value, date,
+        venc,
+        vencMonth: mk, // each parcel has its own billing month
+        responsavel: cdUser,
+        parcelGroup: groupId, parcelCur: pNum, parcelTotal: total, parcelStartKey: startKey,
+        reflectido: cdUser !== 'nenhum',
+      };
+      updates[`cartoes/${cid}/despesas/${eid}`] = despesa;
+      if (cdUser !== 'nenhum') {
+        updates[`financas/${mk}/${cdUser}/expenses/${eid}`] = buildHomeExpense(despesa, cid, cartaoName);
+      }
+    }
+  }
+
+  db.ref().update(updates)
+    .then(() => {
+      document.getElementById('cartao-despesa-modal').classList.remove('open');
+      let msg;
+      if (!isParcel) {
+        msg = editId ? '✅ Despesa atualizada!' : '✅ Despesa adicionada!';
+      } else if (editId && editParcelGroup) {
+        msg = '✅ Parcela atualizada!';
+      } else {
+        const cur2  = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
+        const tot2  = parseInt(document.getElementById('cd-parcel-total').value) || 1;
+        msg = `✅ ${tot2 - cur2 + 1} parcelas lançadas!`;
+      }
+      showToast(msg);
+    })
+    .catch(err => { console.error(err); showToast('⚠️ Erro ao salvar'); });
+}
+
+function deleteCartaoDespesaModal() {
+  const did = document.getElementById('cd-edit-id').value;
+  const cid = document.getElementById('cd-cartao-id').value;
+  if (!did || !cid) return;
+  if (!confirm('Excluir apenas esta parcela?')) return;
+  const old = (cartoesData[cid]?.despesas || {})[did];
+  const updates = {};
+  updates[`cartoes/${cid}/despesas/${did}`] = null;
+  if (old && old.responsavel && old.responsavel !== 'nenhum') {
+    const oldMk = old.vencMonth ||
+      (old.date ? (() => { const d = new Date(old.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })() : null);
+    if (oldMk) updates[`financas/${oldMk}/${old.responsavel}/expenses/${did}`] = null;
+  }
+  db.ref().update(updates)
+    .then(() => { document.getElementById('cartao-despesa-modal').classList.remove('open'); showToast('🗑 Parcela excluída!'); })
+    .catch(() => showToast('⚠️ Erro ao excluir'));
+}
+
+function deleteCartaoDespesaGroup() {
+  const did = document.getElementById('cd-edit-id').value;
+  const cid = document.getElementById('cd-cartao-id').value;
+  const groupId = document.getElementById('cd-parcel-group').value;
+  if (!groupId || !cid) return;
+  if (!confirm('Excluir TODAS as parcelas deste grupo?\nIsso removerá os lançamentos em todos os meses.')) return;
+
+  const updates = {};
+  // Remove from cartoes
+  Object.values(cartoesData[cid]?.despesas || {}).forEach(d => {
+    if (d.parcelGroup === groupId) {
+      updates[`cartoes/${cid}/despesas/${d.id}`] = null;
+      // Remove mirror from financas
+      if (d.responsavel && d.responsavel !== 'nenhum') {
+        const dMk = d.vencMonth ||
+          (d.date ? (() => { const dt = new Date(d.date + 'T12:00:00'); return `${dt.getFullYear()}_${MONTH_KEYS[dt.getMonth()]}`; })() : null);
+        if (dMk) updates[`financas/${dMk}/${d.responsavel}/expenses/${d.id}`] = null;
+      }
+    }
+  });
+  // Also search financas globally for any mirror with this parcelGroup (safety net)
+  db.ref('financas').once('value').then(snap => {
+    const allData = snap.val() || {};
+    Object.entries(allData).forEach(([mk, mData]) => {
+      ['vitoria', 'geo'].forEach(u => {
+        const exps = mData?.[u]?.expenses || {};
+        Object.entries(exps).forEach(([eid, exp]) => {
+          if (exp && exp.parcelGroup === groupId) {
+            updates[`financas/${mk}/${u}/expenses/${eid}`] = null;
+          }
+        });
+      });
+    });
+    return db.ref().update(updates);
+  })
+  .then(() => { document.getElementById('cartao-despesa-modal').classList.remove('open'); showToast('🗑 Todas as parcelas excluídas!'); })
+  .catch(() => showToast('⚠️ Erro ao excluir'));
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────
 
 // FAB scroll hide
@@ -953,6 +1657,7 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 
 attachListener();
+attachCartoesListener();
 </script>
 </body>
 </html>
