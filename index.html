@@ -235,6 +235,7 @@
   .cd-user-dot.vitoria { background: #fde8f1; }
   .cd-user-dot.geo { background: #e8f4ff; }
   .cd-user-dot.nenhum { background: var(--surface2); }
+  .cd-user-dot.outros { background: #fff4d6; }
   .cd-info { flex: 1; min-width: 0; }
   .cd-desc { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cd-meta { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; gap: 8px; }
@@ -431,17 +432,24 @@
     <input type="hidden" id="cd-cartao-id">
     <div class="form-group">
       <label class="form-label">Responsável</label>
-      <div style="display:flex;gap:10px">
-        <button type="button" class="cat-btn" id="cd-ubtn-vitoria" onclick="selectCdUser('vitoria')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="cat-btn" id="cd-ubtn-vitoria" onclick="selectCdUser('vitoria')" style="flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center">
           <span class="emoji">👩</span>Vitória
         </button>
-        <button type="button" class="cat-btn" id="cd-ubtn-geo" onclick="selectCdUser('geo')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+        <button type="button" class="cat-btn" id="cd-ubtn-geo" onclick="selectCdUser('geo')" style="flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center">
           <span class="emoji">👨</span>Geovanne
         </button>
-        <button type="button" class="cat-btn" id="cd-ubtn-nenhum" onclick="selectCdUser('nenhum')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+        <button type="button" class="cat-btn" id="cd-ubtn-nenhum" onclick="selectCdUser('nenhum')" style="flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center">
           <span class="emoji">👥</span>Casal
         </button>
+        <button type="button" class="cat-btn" id="cd-ubtn-outros" onclick="selectCdUser('outros')" style="flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center">
+          <span class="emoji">🙋</span>Outros
+        </button>
       </div>
+    </div>
+    <div class="form-group" id="cd-outros-nome-group" style="display:none">
+      <label class="form-label">Quem usou o cartão? (opcional)</label>
+      <input type="text" class="form-input" id="cd-outros-nome" placeholder="Ex: irmão, amigo, sogra...">
     </div>
     <div class="form-group">
       <label class="form-label">Descrição</label>
@@ -641,7 +649,11 @@ function showToast(msg){
 }
 
 function handleOverlayClick(e,id){
-  if(e.target.id===id) document.getElementById(id).classList.remove('open');
+  if(e.target.id===id){
+    if(confirm('Deseja fechar? As informações preenchidas serão perdidas.')){
+      document.getElementById(id).classList.remove('open');
+    }
+  }
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────
@@ -1162,6 +1174,8 @@ function renderCartoes() {
       totalGeral += v;
       if (d.responsavel === 'vitoria') totalVitoria += v;
       else if (d.responsavel === 'geo') totalGeo += v;
+      else if (d.responsavel === 'outros') { /* Outros: não entra na conta de nenhum dos dois */ }
+      else { totalVitoria += v / 2; totalGeo += v / 2; } // Casal: divide igualmente
     });
   });
 
@@ -1202,8 +1216,8 @@ function renderCartoes() {
         h += `<div class="empty-cartao">Nenhuma despesa ainda. Toque em "+ Despesa".</div>`;
       } else {
         despesas.forEach(d => {
-          const userEmoji = d.responsavel === 'vitoria' ? '👩' : d.responsavel === 'geo' ? '👨' : '👥';
-          const userLabel = d.responsavel === 'vitoria' ? 'Vitória' : d.responsavel === 'geo' ? 'Geovanne' : 'Casal';
+          const userEmoji = d.responsavel === 'vitoria' ? '👩' : d.responsavel === 'geo' ? '👨' : d.responsavel === 'outros' ? '🙋' : '👥';
+          const userLabel = d.responsavel === 'vitoria' ? 'Vitória' : d.responsavel === 'geo' ? 'Geovanne' : d.responsavel === 'outros' ? ('Outros' + (d.outrosNome ? ` (${escHtml(d.outrosNome)})` : '')) : 'Casal';
           const dateFormatted = d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
           h += `
           <div class="cartao-despesa-item" onclick="openEditCartaoDespesa('${cid}','${d.id}')">
@@ -1323,6 +1337,7 @@ function openNewCartaoDespesa(cid) {
   document.getElementById('cd-parcel-total').value = 6;
   document.getElementById('btn-delete-cd').style.display = 'none';
   document.getElementById('btn-delete-cd-group').style.display = 'none';
+  document.getElementById('cd-outros-nome').value = '';
   cdPopulateMonthSelect(); // also fills cd-venc-month with default = next month
   selectCdUser('nenhum');
   document.getElementById('cartao-despesa-modal').classList.add('open');
@@ -1360,6 +1375,7 @@ function openEditCartaoDespesa(cid, did) {
   document.getElementById('btn-delete-cd').style.display = 'block';
   document.getElementById('btn-delete-cd').textContent = isParcel ? '🗑 Excluir só esta parcela' : '🗑 Excluir despesa';
   document.getElementById('btn-delete-cd-group').style.display = isParcel ? 'block' : 'none';
+  document.getElementById('cd-outros-nome').value = d.outrosNome || '';
   selectCdUser(d.responsavel || 'nenhum');
   document.getElementById('cartao-despesa-modal').classList.add('open');
   document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
@@ -1367,11 +1383,13 @@ function openEditCartaoDespesa(cid, did) {
 
 function selectCdUser(u) {
   cdUser = u;
-  ['vitoria', 'geo', 'nenhum'].forEach(x => {
+  ['vitoria', 'geo', 'nenhum', 'outros'].forEach(x => {
     const btn = document.getElementById('cd-ubtn-' + x);
     if (btn) btn.className = `cat-btn${cdUser === x ? ' selected' : ''}`;
-    if (btn) btn.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center';
+    if (btn) btn.style.cssText = 'flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center';
   });
+  const nomeGroup = document.getElementById('cd-outros-nome-group');
+  if (nomeGroup) nomeGroup.style.display = cdUser === 'outros' ? '' : 'none';
 }
 
 // ─── CARD PARCEL HELPERS ──────────────────────────────────────────
@@ -1438,16 +1456,19 @@ function updateCdParcelPreview() {
   el.textContent = `✔ ${remaining} parcela${remaining !== 1 ? 's' : ''} serão lançadas (${cur}/${total} até ${total}/${total})`;
 }
 
-// Helper: given a despesa object from cartoes, build home expense mirroring it
-function buildHomeExpense(despesa, cid, cartaoName) {
+// Helper: given a despesa object from cartoes, build home expense mirroring it.
+// `owner` is who this specific mirror belongs to ('vitoria' or 'geo').
+// `value` allows overriding the value (used to split "Casal" expenses in half).
+function buildHomeExpense(despesa, cid, cartaoName, owner, value) {
   // For the home screen, venc day is the bill day (05, 10, 20 etc.)
   // The record lives in the financas month key = despesa.vencMonth
+  const isCasal = despesa.responsavel === 'nenhum';
   return {
     id: despesa.id,
-    _owner: despesa.responsavel,
+    _owner: owner,
     cat: 'cartao',
-    desc: `💳 ${cartaoName}: ${despesa.desc}`,
-    value: despesa.value,
+    desc: `💳 ${cartaoName}: ${despesa.desc}${isCasal ? ' (metade - casal)' : ''}`,
+    value: value !== undefined ? value : despesa.value,
     venc: despesa.venc,         // day (05, 10, 20...)
     vencMonth: despesa.vencMonth, // month key stored for reference
     payment: cartaoName,
@@ -1457,7 +1478,28 @@ function buildHomeExpense(despesa, cid, cartaoName) {
     parcelTotal: despesa.parcelTotal || null,
     parcelStartKey: despesa.parcelStartKey || null,
     fromCartao: cid,
+    casalSplit: isCasal || null,
   };
+}
+
+// Adds the correct home-mirror update(s) for a despesa into `updates`.
+// If responsavel is 'vitoria' or 'geo', mirrors the full value to that user.
+// If responsavel is 'nenhum' (Casal), splits the value equally between both users.
+function addHomeMirrorUpdates(updates, despesa, cid, cartaoName) {
+  const mk = despesa.vencMonth;
+  if (!mk) return;
+  if (despesa.responsavel === 'outros') return; // Não reflete na tela inicial: não é gasto de nenhum dos dois
+  if (despesa.responsavel === 'vitoria' || despesa.responsavel === 'geo') {
+    updates[`financas/${mk}/${despesa.responsavel}/expenses/${despesa.id}`] =
+      buildHomeExpense(despesa, cid, cartaoName, despesa.responsavel, despesa.value);
+  } else {
+    // Casal: divide o valor igualmente entre os dois usuários
+    const half = Math.round((Number(despesa.value || 0) / 2) * 100) / 100;
+    updates[`financas/${mk}/vitoria/expenses/${despesa.id}`] =
+      buildHomeExpense(despesa, cid, cartaoName, 'vitoria', half);
+    updates[`financas/${mk}/geo/expenses/${despesa.id}`] =
+      buildHomeExpense(despesa, cid, cartaoName, 'geo', half);
+  }
 }
 
 function saveCartaoDespesa() {
@@ -1470,6 +1512,7 @@ function saveCartaoDespesa() {
   const editId  = document.getElementById('cd-edit-id').value;
   const editParcelGroup = document.getElementById('cd-parcel-group').value;
   const isParcel = document.getElementById('cd-is-parcel').checked;
+  const outrosNome = document.getElementById('cd-outros-nome').value.trim();
   const cartaoName = cartoesData[cid]?.name || 'Cartão';
 
   if (!desc)     { showToast('⚠️ Preencha a descrição'); return; }
@@ -1481,13 +1524,20 @@ function saveCartaoDespesa() {
 
   // ── Helper: remove old home mirror using stored vencMonth ─────────
   const removeOldMirror = (oldDespesa) => {
-    if (!oldDespesa || !oldDespesa.responsavel || oldDespesa.responsavel === 'nenhum') return;
+    if (!oldDespesa) return;
     // Use stored vencMonth if available, fallback to date-based for legacy entries
     const oldMk = oldDespesa.vencMonth ||
       (oldDespesa.date
         ? (() => { const d = new Date(oldDespesa.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })()
         : null);
-    if (oldMk) updates[`financas/${oldMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
+    if (!oldMk) return;
+    if (oldDespesa.responsavel === 'vitoria' || oldDespesa.responsavel === 'geo') {
+      updates[`financas/${oldMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
+    } else {
+      // Casal (ou legado 'nenhum'): remove de ambos, caso exista
+      updates[`financas/${oldMk}/vitoria/expenses/${oldDespesa.id}`] = null;
+      updates[`financas/${oldMk}/geo/expenses/${oldDespesa.id}`] = null;
+    }
   };
 
   if (!isParcel) {
@@ -1505,12 +1555,10 @@ function saveCartaoDespesa() {
     }
 
     const did = editId || db.ref().push().key;
-    const despesa = { id: did, desc, value, date, venc, vencMonth, responsavel: cdUser, parcelGroup: null, reflectido: cdUser !== 'nenhum' };
+    const despesa = { id: did, desc, value, date, venc, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, parcelGroup: null, reflectido: cdUser !== 'outros' };
     updates[`cartoes/${cid}/despesas/${did}`] = despesa;
-    if (cdUser !== 'nenhum') {
-      // Mirror goes into the bill month (vencMonth), not purchase month
-      updates[`financas/${vencMonth}/${cdUser}/expenses/${did}`] = buildHomeExpense(despesa, cid, cartaoName);
-    }
+    // Mirror goes into the bill month (vencMonth), not purchase month
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
 
   } else if (editId && editParcelGroup) {
     // ── Editar parcela individual já existente ────────────────────
@@ -1521,11 +1569,9 @@ function saveCartaoDespesa() {
 
     if (old) removeOldMirror(old);
 
-    const despesa = { id: editId, desc, value, date, venc, vencMonth, responsavel: cdUser, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'nenhum' };
+    const despesa = { id: editId, desc, value, date, venc, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'outros' };
     updates[`cartoes/${cid}/despesas/${editId}`] = despesa;
-    if (cdUser !== 'nenhum') {
-      updates[`financas/${vencMonth}/${cdUser}/expenses/${editId}`] = buildHomeExpense(despesa, cid, cartaoName);
-    }
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
 
   } else {
     // ── Novo parcelado: criar uma entrada por mês ─────────────────
@@ -1558,13 +1604,12 @@ function saveCartaoDespesa() {
         venc,
         vencMonth: mk, // each parcel has its own billing month
         responsavel: cdUser,
+        outrosNome: cdUser === 'outros' ? outrosNome : null,
         parcelGroup: groupId, parcelCur: pNum, parcelTotal: total, parcelStartKey: startKey,
-        reflectido: cdUser !== 'nenhum',
+        reflectido: cdUser !== 'outros',
       };
       updates[`cartoes/${cid}/despesas/${eid}`] = despesa;
-      if (cdUser !== 'nenhum') {
-        updates[`financas/${mk}/${cdUser}/expenses/${eid}`] = buildHomeExpense(despesa, cid, cartaoName);
-      }
+      addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
     }
   }
 
@@ -1594,10 +1639,17 @@ function deleteCartaoDespesaModal() {
   const old = (cartoesData[cid]?.despesas || {})[did];
   const updates = {};
   updates[`cartoes/${cid}/despesas/${did}`] = null;
-  if (old && old.responsavel && old.responsavel !== 'nenhum') {
+  if (old) {
     const oldMk = old.vencMonth ||
       (old.date ? (() => { const d = new Date(old.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })() : null);
-    if (oldMk) updates[`financas/${oldMk}/${old.responsavel}/expenses/${did}`] = null;
+    if (oldMk) {
+      if (old.responsavel === 'vitoria' || old.responsavel === 'geo') {
+        updates[`financas/${oldMk}/${old.responsavel}/expenses/${did}`] = null;
+      } else {
+        updates[`financas/${oldMk}/vitoria/expenses/${did}`] = null;
+        updates[`financas/${oldMk}/geo/expenses/${did}`] = null;
+      }
+    }
   }
   db.ref().update(updates)
     .then(() => { document.getElementById('cartao-despesa-modal').classList.remove('open'); showToast('🗑 Parcela excluída!'); })
@@ -1617,10 +1669,15 @@ function deleteCartaoDespesaGroup() {
     if (d.parcelGroup === groupId) {
       updates[`cartoes/${cid}/despesas/${d.id}`] = null;
       // Remove mirror from financas
-      if (d.responsavel && d.responsavel !== 'nenhum') {
-        const dMk = d.vencMonth ||
-          (d.date ? (() => { const dt = new Date(d.date + 'T12:00:00'); return `${dt.getFullYear()}_${MONTH_KEYS[dt.getMonth()]}`; })() : null);
-        if (dMk) updates[`financas/${dMk}/${d.responsavel}/expenses/${d.id}`] = null;
+      const dMk = d.vencMonth ||
+        (d.date ? (() => { const dt = new Date(d.date + 'T12:00:00'); return `${dt.getFullYear()}_${MONTH_KEYS[dt.getMonth()]}`; })() : null);
+      if (dMk) {
+        if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+          updates[`financas/${dMk}/${d.responsavel}/expenses/${d.id}`] = null;
+        } else {
+          updates[`financas/${dMk}/vitoria/expenses/${d.id}`] = null;
+          updates[`financas/${dMk}/geo/expenses/${d.id}`] = null;
+        }
       }
     }
   });
