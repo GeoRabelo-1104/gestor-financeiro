@@ -35,8 +35,8 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; }
 
   /* HEADER */
-  .app-header { background: linear-gradient(135deg, #6C5CE7 0%, #a29bfe 100%); color: white; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 24px rgba(108,92,231,0.25); }
-  .header-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; }
+  .app-header { background: linear-gradient(135deg, #6C5CE7 0%, #a29bfe 100%); color: white; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 24px rgba(108,92,231,0.25);}
+  .header-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; margin-bottom: 20px;}
   .app-title { font-size: 20px; font-weight: 700; }
   .app-title span { opacity: 0.75; font-weight: 400; font-size: 13px; display: block; }
   .header-actions { display: flex; gap: 8px; align-items: center; }
@@ -46,6 +46,24 @@
   .sync-dot.syncing { background: #fdcb6e; box-shadow: 0 0 6px #fdcb6e; animation: pulse 1s infinite; }
   .sync-dot.error { background: #ff7675; box-shadow: 0 0 6px #ff7675; }
   @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  /* LOGIN SCREEN */
+  .login-screen { position: fixed; inset: 0; z-index: 1000; background: linear-gradient(135deg, #6C5CE7 0%, #a29bfe 100%); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { background: var(--surface); border-radius: 20px; padding: 32px 26px; width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); text-align: center; }
+  .login-card .login-emoji { font-size: 40px; margin-bottom: 4px; }
+  .login-card h1 { font-size: 19px; margin-bottom: 4px; color: var(--text); }
+  .login-card p { font-size: 13px; color: var(--text2); margin-bottom: 22px; }
+  .login-field { text-align: left; margin-bottom: 14px; }
+  .login-field label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 6px; }
+  .login-field input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; background: var(--surface2); color: var(--text); outline: none; transition: border-color 0.2s; }
+  .login-field input:focus { border-color: var(--primary); }
+  .login-btn { width: 100%; padding: 13px; border: none; border-radius: var(--radius-sm); background: var(--primary); color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; transition: background 0.2s; }
+  .login-btn:hover { background: var(--primary-dark); }
+  .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 16px; }
+  .login-hidden { display: none !important; }
+  .logout-btn { background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 15px; transition: background 0.2s; }
+  .logout-btn:hover { background: rgba(255,255,255,0.3); }
 
   .user-tabs { display: flex; margin: 12px 20px 0; background: rgba(0,0,0,0.12); border-radius: 12px 12px 0 0; overflow: hidden; }
   .user-tab { flex: 1; padding: 10px 16px; border: none; background: transparent; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -267,6 +285,29 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-emoji">💑</div>
+    <h1>Finanças do Casal</h1>
+    <p>Entre para acessar seus dados</p>
+    <form id="login-form" onsubmit="return doLogin(event)">
+      <div class="login-field">
+        <label for="login-email">E-mail</label>
+        <input type="email" id="login-email" autocomplete="username" required>
+      </div>
+      <div class="login-field">
+        <label for="login-password">Senha</label>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-btn" id="login-submit-btn">Entrar</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<div id="app-root" class="login-hidden">
+
 <header class="app-header">
   <div class="header-top">
     <div class="app-title">
@@ -276,6 +317,7 @@
     <div class="header-actions">
       <div class="sync-dot syncing" id="sync-dot"></div>
       <button class="btn-icon" onclick="showSalaryModal()" title="Salários">💰</button>
+      <button class="logout-btn" onclick="doLogout()" title="Sair">🚪</button>
     </div>
   </div>
   <div class="nav-tabs" id="nav-tabs">
@@ -529,9 +571,12 @@
 
 <div class="toast" id="toast"></div>
 
+</div><!-- /#app-root -->
+
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <script>
 // ─── FIREBASE CONFIG ──────────────────────────────────────────────
@@ -546,6 +591,53 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const auth = firebase.auth();
+
+// ─── AUTENTICAÇÃO ──────────────────────────────────────────────────
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
+
+function doLogin(ev){
+  ev.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-submit-btn');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(err => {
+      errEl.textContent = 'E-mail ou senha incorretos.';
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    });
+  return false;
+}
+
+function doLogout(){
+  if(!confirm('Deseja sair da sua conta?')) return;
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(user => {
+  const loginScreen = document.getElementById('login-screen');
+  const appRoot = document.getElementById('app-root');
+  if(user){
+    loginScreen.classList.add('login-hidden');
+    appRoot.classList.remove('login-hidden');
+    // Só inicia os listeners do Firebase depois de autenticado
+    if(!window.__appStarted){
+      window.__appStarted = true;
+      attachListener();
+      attachCartoesListener();
+    }
+  } else {
+    appRoot.classList.add('login-hidden');
+    loginScreen.classList.remove('login-hidden');
+    const btn = document.getElementById('login-submit-btn');
+    if(btn){ btn.disabled = false; btn.textContent = 'Entrar'; }
+  }
+});
 
 // ─── CONSTANTS ────────────────────────────────────────────────────
 const MONTHS     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -667,10 +759,14 @@ function render(){
   const ud     = monthData[state.user];
   const allExp = Object.values(ud.expenses||{});
   const filtered = state.filterCat==='all' ? allExp : allExp.filter(e=>e.cat===state.filterCat);
+  // Qualquer vencimento diferente de "20" cai no balde "05" (restante do salário),
+  // pois o modelo de saldo é binário (adiantamento dia 20 + restante dia 05).
+  // Antes, despesas de cartão com vencimento em 01/10/15/25/"último dia" não
+  // apareciam em nenhuma lista e ficavam de fora do saldo/total gasto.
   const exp20  = filtered.filter(e=>e.venc==='20');
-  const exp05  = filtered.filter(e=>e.venc==='05');
+  const exp05  = filtered.filter(e=>e.venc!=='20');
   const total20= allExp.filter(e=>e.venc==='20').reduce((a,e)=>a+Number(e.value),0);
-  const total05= allExp.filter(e=>e.venc==='05').reduce((a,e)=>a+Number(e.value),0);
+  const total05= allExp.filter(e=>e.venc!=='20').reduce((a,e)=>a+Number(e.value),0);
   const income = Number(ud.salary20||0)+Number(ud.salary05||0)+Number(ud.extra||0);
   const spent  = total20+total05;
   const balance= income-spent;
@@ -859,6 +955,13 @@ function openEdit(id, owner){
   const u = owner || state.user;
   const exp = (monthData[u]?.expenses||{})[id];
   if(!exp) return;
+  // Lançamentos espelhados de um cartão não podem ser editados/excluídos aqui:
+  // fazer isso desconectaria o espelho do registro original em "cartoes",
+  // deixando dados órfãos e divergentes entre as duas telas.
+  if(exp.fromCartao){
+    showToast('💳 Esse lançamento vem de um cartão. Edite ou exclua na aba Cartões.');
+    return;
+  }
   formUser=u;
   document.getElementById('edit-id').value=id;
   document.getElementById('edit-month-key').value=monthKey();
@@ -1712,9 +1815,6 @@ window.addEventListener('scroll', () => {
   else if (sy < lastScrollY - 10) fab.classList.remove('hidden');
   lastScrollY = sy;
 }, { passive: true });
-
-attachListener();
-attachCartoesListener();
 </script>
 </body>
 </html>
