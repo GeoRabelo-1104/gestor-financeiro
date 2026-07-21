@@ -269,6 +269,37 @@
   .cartao-sum-card .cslabel { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
   .cartao-sum-card .csval { font-size: 20px; font-weight: 700; color: var(--text); }
 
+  /* LIMITE DO CARTÃO */
+  .cartao-limite-bar { padding: 10px 16px 12px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .cartao-limite-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); margin-bottom: 5px; font-weight: 600; }
+  .cartao-limite-row .used { color: var(--text); }
+  .cartao-meta-line { font-size: 11px; opacity: 0.75; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* FATURAS (invoices) */
+  .fatura-list { }
+  .fatura-block { border-bottom: 1px solid var(--border); }
+  .fatura-block:last-child { border-bottom: none; }
+  .fatura-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: background 0.15s; background: var(--surface); }
+  .fatura-header:hover { background: var(--surface2); }
+  .fatura-header.current { background: #f0effe; }
+  .fatura-header.paga { opacity: 0.6; }
+  .fatura-info { flex: 1; min-width: 0; }
+  .fatura-month { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .fatura-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .fatura-right { text-align: right; flex-shrink: 0; }
+  .fatura-total { font-size: 15px; font-weight: 700; color: var(--text); }
+  .fatura-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; margin-top: 3px; display: inline-block; }
+  .fatura-status.aberta { background: #fff3e0; color: #f39c12; }
+  .fatura-status.paga-badge { background: #e8f8f2; color: var(--success); }
+  .fatura-chevron { font-size: 12px; color: var(--text3); transition: transform 0.2s; flex-shrink: 0; }
+  .fatura-chevron.open { transform: rotate(180deg); }
+  .fatura-body { display: none; background: var(--bg); }
+  .fatura-body.open { display: block; }
+  .fatura-actions { display: flex; gap: 6px; padding: 8px 16px; }
+  .fatura-empty { padding: 16px; text-align: center; color: var(--text3); font-size: 12px; }
+  .cd-check { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .cd-check.checked { background: var(--success); border-color: var(--success); color: white; }
+
   /* RESPONSIVE */
   @media (min-width: 600px) {
     .main { padding: 24px; }
@@ -420,7 +451,7 @@
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Mês inicial</label>
-              <select class="form-select" id="f-parcel-month" onchange="updateParcelPreview()"></select>
+              <select class="form-select" id="f-parcel-month"></select>
             </div>
           </div>
           <div id="parcel-preview" class="recap-badge"></div>
@@ -460,6 +491,28 @@
         <button type="button" class="cat-btn" onclick="selectCartaoEmoji('⭐')" style="width:44px;padding:8px">⭐</button>
       </div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Limite do cartão (R$)</label>
+      <input type="number" class="form-input" id="nc-limite" placeholder="0,00" step="0.01" min="0">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Fechamento (dia)</label>
+        <select class="form-select" id="nc-fechamento">
+          <option value="01">Dia 01</option><option value="05">Dia 05</option><option value="10">Dia 10</option>
+          <option value="15">Dia 15</option><option value="20">Dia 20</option><option value="25">Dia 25</option>
+          <option value="28">Dia 28</option><option value="ultimo">Último dia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vencimento (dia)</label>
+        <select class="form-select" id="nc-vencimento">
+          <option value="01">Dia 01</option><option value="05">Dia 05</option><option value="10">Dia 10</option>
+          <option value="15">Dia 15</option><option value="20">Dia 20</option><option value="25">Dia 25</option>
+          <option value="28">Dia 28</option><option value="ultimo">Último dia</option>
+        </select>
+      </div>
+    </div>
     <button class="btn-save" onclick="saveNovoCartao()">💾 Salvar cartão</button>
     <button class="btn-delete" id="btn-delete-cartao" onclick="deleteCartao()" style="display:none">🗑 Excluir cartão</button>
   </div>
@@ -471,6 +524,7 @@
     <div class="modal-handle"></div>
     <div class="modal-title" id="cartao-despesa-title">➕ Nova despesa no cartão</div>
     <input type="hidden" id="cd-edit-id">
+    <input type="hidden" id="cd-edit-mk">
     <input type="hidden" id="cd-cartao-id">
     <div class="form-group">
       <label class="form-label">Responsável</label>
@@ -507,26 +561,13 @@
         <input type="date" class="form-input" id="cd-date">
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Vencimento da fatura</label>
-      <div class="form-row">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Dia</label>
-          <select class="form-select" id="cd-venc">
-            <option value="01">Dia 01</option>
-            <option value="05">Dia 05</option>
-            <option value="10">Dia 10</option>
-            <option value="15">Dia 15</option>
-            <option value="20">Dia 20</option>
-            <option value="25">Dia 25</option>
-            <option value="ultimo">Último dia</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:0" id="cd-venc-month-row">
-          <label class="form-label">Mês da fatura</label>
-          <select class="form-select" id="cd-venc-month"></select>
-        </div>
-      </div>
+    <div class="form-group" id="cd-venc-month-row">
+      <label class="form-label">Fatura (mês)</label>
+      <select class="form-select" id="cd-venc-month"></select>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Já pago?</span>
+      <label class="toggle"><input type="checkbox" id="cd-paid"><span class="toggle-slider"></span></label>
     </div>
     <div class="toggle-row">
       <span class="toggle-label">É parcelado?</span>
@@ -1256,6 +1297,7 @@ function attachCartoesListener() {
   cartoesRef = db.ref('cartoes');
   cartoesCallback = function(snap) {
     cartoesData = snap.val() || {};
+    migrateLegacyCartoes(cartoesData);
     if (currentScreen === 'cards') renderCartoes();
     // Also re-render home if open to reflect card totals
     if (currentScreen === 'home' && monthData) render();
@@ -1263,22 +1305,76 @@ function attachCartoesListener() {
   cartoesRef.on('value', cartoesCallback);
 }
 
+// ─── MIGRAÇÃO: formato antigo (despesas soltas) → faturas por mês ──
+// Cartões antigos guardavam despesas soltas em `cartoes/{cid}/despesas`.
+// Agora cada cartão tem `cartoes/{cid}/faturas/{mesKey}/despesas`, permitindo
+// gerenciar cada fatura (mês) separadamente, como em um app de banco.
+// Esta função roda sempre que os dados chegam e migra silenciosamente
+// qualquer cartão que ainda esteja no formato antigo, além de garantir
+// que os campos de limite/fechamento/vencimento existam.
+function migrateLegacyCartoes(data) {
+  const updates = {};
+  Object.entries(data || {}).forEach(([cid, c]) => {
+    if (c.despesas && Object.keys(c.despesas).length) {
+      Object.values(c.despesas).forEach(d => {
+        const mk = d.vencMonth || (d.date
+          ? (() => { const dt = new Date(d.date + 'T12:00:00'); return `${dt.getFullYear()}_${MONTH_KEYS[dt.getMonth()]}`; })()
+          : `${now.getFullYear()}_${MONTH_KEYS[now.getMonth()]}`);
+        const nd = { ...d, vencMonth: mk, paid: d.paid || false };
+        delete nd.venc; // dia agora é definido no cartão (vencimentoDia), não por despesa
+        updates[`cartoes/${cid}/faturas/${mk}/despesas/${d.id}`] = nd;
+      });
+      updates[`cartoes/${cid}/despesas`] = null;
+    }
+    if (c.limite === undefined) updates[`cartoes/${cid}/limite`] = 0;
+    if (!c.vencimentoDia) updates[`cartoes/${cid}/vencimentoDia`] = '05';
+    if (!c.fechamentoDia) updates[`cartoes/${cid}/fechamentoDia`] = '28';
+  });
+  if (Object.keys(updates).length) {
+    db.ref().update(updates).catch(err => console.error('Erro na migração de cartões:', err));
+  }
+}
+
+function diaLabel(dia) { return dia === 'ultimo' ? 'no último dia' : `dia ${dia}`; }
+function mkLabel(mk) {
+  const [y, mk2] = mk.split('_');
+  return `${MONTHS[MONTH_KEYS.indexOf(mk2)]} ${y}`;
+}
+
+// Gera as chaves de mês (faturas) a exibir para um cartão: todas as que já
+// têm dados + uma janela de mês-anterior até 3 meses à frente, para que
+// sempre haja onde lançar despesas futuras sem precisar criar a fatura antes.
+function getFaturaKeys(c) {
+  const keys = new Set(Object.keys(c.faturas || {}));
+  const y = now.getFullYear(), m = now.getMonth();
+  for (let i = -1; i <= 3; i++) {
+    let mm = (m + i) % 12; if (mm < 0) mm += 12;
+    const yy = y + Math.floor((m + i) / 12);
+    keys.add(`${yy}_${MONTH_KEYS[mm]}`);
+  }
+  return Array.from(keys).sort((a, b) => {
+    const [ay, am] = a.split('_'); const [by, bm] = b.split('_');
+    return (parseInt(ay) * 12 + MONTH_KEYS.indexOf(am)) - (parseInt(by) * 12 + MONTH_KEYS.indexOf(bm));
+  });
+}
+
 function renderCartoes() {
   const main = document.getElementById('main-content');
   const cartaoList = Object.entries(cartoesData);
+  const curMk = `${now.getFullYear()}_${MONTH_KEYS[now.getMonth()]}`;
 
-  // Totais gerais
-  let totalGeral = 0;
-  let totalVitoria = 0;
-  let totalGeo = 0;
+  // Totais gerais (soma de todas as faturas de todos os cartões)
+  let totalGeral = 0, totalVitoria = 0, totalGeo = 0;
   cartaoList.forEach(([cid, c]) => {
-    Object.values(c.despesas || {}).forEach(d => {
-      const v = Number(d.value || 0);
-      totalGeral += v;
-      if (d.responsavel === 'vitoria') totalVitoria += v;
-      else if (d.responsavel === 'geo') totalGeo += v;
-      else if (d.responsavel === 'outros') { /* Outros: não entra na conta de nenhum dos dois */ }
-      else { totalVitoria += v / 2; totalGeo += v / 2; } // Casal: divide igualmente
+    Object.values(c.faturas || {}).forEach(fat => {
+      Object.values(fat.despesas || {}).forEach(d => {
+        const v = Number(d.value || 0);
+        totalGeral += v;
+        if (d.responsavel === 'vitoria') totalVitoria += v;
+        else if (d.responsavel === 'geo') totalGeo += v;
+        else if (d.responsavel === 'outros') { /* não entra na conta de nenhum dos dois */ }
+        else { totalVitoria += v / 2; totalGeo += v / 2; }
+      });
     });
   });
 
@@ -1293,56 +1389,98 @@ function renderCartoes() {
     h += `<div class="empty-state"><div class="icon">💳</div><p>Nenhum cartão cadastrado ainda.<br>Adicione seu primeiro cartão abaixo.</p></div>`;
   } else {
     cartaoList.forEach(([cid, c]) => {
-      const despesas = Object.values(c.despesas || {}).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      const total = despesas.reduce((s, d) => s + Number(d.value || 0), 0);
+      const faturaKeys = getFaturaKeys(c);
+      const limite = Number(c.limite || 0);
+      let usado = 0;
+      faturaKeys.forEach(mk => {
+        const fat = (c.faturas || {})[mk];
+        if (fat && !fat.paga) Object.values(fat.despesas || {}).forEach(d => usado += Number(d.value || 0));
+      });
+      const pct = limite > 0 ? Math.min(100, (usado / limite) * 100) : 0;
+      const barClass = pct < 80 ? 'ok' : pct < 100 ? 'warn' : 'over';
+
       h += `
       <div class="cartao-block" id="cblock-${cid}">
         <div class="cartao-header" onclick="toggleCartaoBlock('${cid}')">
           <div class="cartao-chip">${escHtml(c.emoji || '💳')}</div>
           <div class="cartao-info">
             <div class="cartao-name">${escHtml(c.name || 'Cartão')}</div>
-            <div class="cartao-meta">${despesas.length} despesa${despesas.length !== 1 ? 's' : ''}</div>
+            <div class="cartao-meta-line">
+              <span>📅 Fecha ${diaLabel(c.fechamentoDia || '28')}</span>
+              <span>💰 Vence ${diaLabel(c.vencimentoDia || '05')}</span>
+            </div>
           </div>
           <div>
-            <div class="cartao-total">${fmt(total)}</div>
-            <div class="cartao-total-label">Total</div>
+            <div class="cartao-total">${fmt(usado)}</div>
+            <div class="cartao-total-label">Em aberto</div>
           </div>
         </div>
         <div class="cartao-actions">
-          <button class="btn-cartao-action" onclick="openNewCartaoDespesa('${cid}')">+ Despesa</button>
-          <button class="btn-cartao-action" onclick="openEditCartao('${cid}')">✏️ Editar</button>
+          <button class="btn-cartao-action" onclick="openEditCartao('${cid}')">✏️ Editar cartão</button>
           <button class="btn-cartao-action danger" onclick="confirmDeleteCartao('${cid}')">🗑 Excluir</button>
-        </div>
-        <div class="cartao-despesas" id="cdlist-${cid}">`;
+        </div>`;
 
-      if (!despesas.length) {
-        h += `<div class="empty-cartao">Nenhuma despesa ainda. Toque em "+ Despesa".</div>`;
-      } else {
-        despesas.forEach(d => {
-          const userEmoji = d.responsavel === 'vitoria' ? '👩' : d.responsavel === 'geo' ? '👨' : d.responsavel === 'outros' ? '🙋' : '👥';
-          const userLabel = d.responsavel === 'vitoria' ? 'Vitória' : d.responsavel === 'geo' ? 'Geovanne' : d.responsavel === 'outros' ? ('Outros' + (d.outrosNome ? ` (${escHtml(d.outrosNome)})` : '')) : 'Casal';
-          const dateFormatted = d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-          h += `
-          <div class="cartao-despesa-item" onclick="openEditCartaoDespesa('${cid}','${d.id}')">
-            <div class="cd-user-dot ${d.responsavel || 'nenhum'}">${userEmoji}</div>
-            <div class="cd-info">
-              <div class="cd-desc">${escHtml(d.desc || '—')}</div>
-              <div class="cd-meta">
-                <span>${userLabel}</span>
-                <span>🛒 ${dateFormatted}</span>
-                ${d.vencMonth ? `<span>📅 Fatura: ${(()=>{ const [y,mk]=d.vencMonth.split('_'); return MONTHS[MONTH_KEYS.indexOf(mk)]+' '+y; })()}</span>` : ''}
-                ${d.parcelGroup ? `<span class="cd-badge">${d.parcelCur}/${d.parcelTotal}</span>` : ''}
-                ${d.reflectido ? '<span class="cd-badge">✓ Na tela inicial</span>' : ''}
-              </div>
-            </div>
-            <div class="cd-right">
-              <div class="cd-value">${fmt(d.value)}</div>
-              <div class="cd-venc">Dia ${escHtml(d.venc || '—')}</div>
-            </div>
-          </div>`;
-        });
+      if (limite > 0) {
+        h += `<div class="cartao-limite-bar">
+          <div class="cartao-limite-row"><span>Limite usado</span><span class="used">${fmt(usado)} / ${fmt(limite)}</span></div>
+          <div class="bar-track"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div>
+        </div>`;
       }
 
+      h += `<div class="fatura-list" id="cdlist-${cid}">`;
+      faturaKeys.forEach(mk => {
+        const fat = (c.faturas || {})[mk] || {};
+        const despesasArr = Object.values(fat.despesas || {}).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        const totalFat = despesasArr.reduce((s, d) => s + Number(d.value || 0), 0);
+        const isCur = mk === curMk;
+
+        h += `
+        <div class="fatura-block">
+          <div class="fatura-header ${isCur ? 'current' : ''} ${fat.paga ? 'paga' : ''}" onclick="toggleFaturaBlock('${cid}','${mk}')">
+            <div class="fatura-info">
+              <div class="fatura-month">📅 ${mkLabel(mk)}${isCur ? ' <span style="font-size:10px;color:var(--primary);text-transform:uppercase">• atual</span>' : ''}</div>
+              <div class="fatura-sub">Vence ${diaLabel(c.vencimentoDia || '05')} • ${despesasArr.length} lançamento${despesasArr.length !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="fatura-right">
+              <div class="fatura-total">${fmt(totalFat)}</div>
+              <span class="fatura-status ${fat.paga ? 'paga-badge' : 'aberta'}">${fat.paga ? 'Paga' : 'Aberta'}</span>
+            </div>
+            <span class="fatura-chevron" id="chev-${cid}-${mk}">▾</span>
+          </div>
+          <div class="fatura-body" id="fbody-${cid}-${mk}">
+            <div class="fatura-actions">
+              <button class="btn-cartao-action" onclick="event.stopPropagation();openNewCartaoDespesa('${cid}','${mk}')">+ Despesa</button>
+              <button class="btn-cartao-action" onclick="event.stopPropagation();toggleFaturaPaga('${cid}','${mk}',${!!fat.paga})">${fat.paga ? '↩️ Reabrir fatura' : '✅ Marcar fatura como paga'}</button>
+            </div>`;
+
+        if (!despesasArr.length) {
+          h += `<div class="fatura-empty">Nenhuma despesa nesta fatura ainda. Toque em "+ Despesa".</div>`;
+        } else {
+          despesasArr.forEach(d => {
+            const userEmoji = d.responsavel === 'vitoria' ? '👩' : d.responsavel === 'geo' ? '👨' : d.responsavel === 'outros' ? '🙋' : '👥';
+            const userLabel = d.responsavel === 'vitoria' ? 'Vitória' : d.responsavel === 'geo' ? 'Geovanne' : d.responsavel === 'outros' ? ('Outros' + (d.outrosNome ? ` (${escHtml(d.outrosNome)})` : '')) : 'Casal';
+            const dateFormatted = d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+            h += `
+            <div class="cartao-despesa-item ${d.paid ? 'paid' : ''}" onclick="openEditCartaoDespesa('${cid}','${mk}','${d.id}')">
+              <div class="cd-check ${d.paid ? 'checked' : ''}" onclick="toggleDespesaPaid(event,'${cid}','${mk}','${d.id}',${!!d.paid})">${d.paid ? '✓' : ''}</div>
+              <div class="cd-user-dot ${d.responsavel || 'nenhum'}">${userEmoji}</div>
+              <div class="cd-info">
+                <div class="cd-desc">${escHtml(d.desc || '—')}</div>
+                <div class="cd-meta">
+                  <span>${userLabel}</span>
+                  <span>🛒 ${dateFormatted}</span>
+                  ${d.parcelGroup ? `<span class="cd-badge">${d.parcelCur}/${d.parcelTotal}</span>` : ''}
+                  ${d.paid ? '<span class="paid-badge">Pago</span>' : '<span class="unpaid-badge">A pagar</span>'}
+                </div>
+              </div>
+              <div class="cd-right">
+                <div class="cd-value">${fmt(d.value)}</div>
+              </div>
+            </div>`;
+          });
+        }
+        h += `</div></div>`;
+      });
       h += `</div></div>`;
     });
   }
@@ -1358,10 +1496,43 @@ function toggleCartaoBlock(cid) {
   if (list) list.style.display = list.style.display === 'none' ? '' : 'none';
 }
 
+function toggleFaturaBlock(cid, mk) {
+  const body = document.getElementById(`fbody-${cid}-${mk}`);
+  const chev = document.getElementById(`chev-${cid}-${mk}`);
+  if (!body) return;
+  body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open');
+}
+
+function toggleFaturaPaga(cid, mk, cur) {
+  db.ref(`cartoes/${cid}/faturas/${mk}/paga`).set(!cur)
+    .then(() => showToast(!cur ? '✅ Fatura marcada como paga!' : '↩️ Fatura reaberta!'))
+    .catch(() => showToast('⚠️ Erro ao atualizar'));
+}
+
+function toggleDespesaPaid(ev, cid, mk, did, cur) {
+  ev.stopPropagation();
+  const updates = {};
+  updates[`cartoes/${cid}/faturas/${mk}/despesas/${did}/paid`] = !cur;
+  const d = (cartoesData[cid]?.faturas?.[mk]?.despesas || {})[did];
+  if (d) {
+    if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+      updates[`financas/${mk}/${d.responsavel}/expenses/${did}/paid`] = !cur;
+    } else if (d.responsavel !== 'outros') {
+      updates[`financas/${mk}/vitoria/expenses/${did}/paid`] = !cur;
+      updates[`financas/${mk}/geo/expenses/${did}/paid`] = !cur;
+    }
+  }
+  db.ref().update(updates).catch(() => showToast('⚠️ Erro ao atualizar'));
+}
+
 // ─── NEW CARTAO MODAL ─────────────────────────────────────────────
 function openNewCartao() {
   document.getElementById('edit-cartao-id').value = '';
   document.getElementById('nc-name').value = '';
+  document.getElementById('nc-limite').value = '';
+  document.getElementById('nc-fechamento').value = '28';
+  document.getElementById('nc-vencimento').value = '05';
   document.getElementById('new-cartao-title').textContent = '💳 Novo Cartão';
   document.getElementById('btn-delete-cartao').style.display = 'none';
   selectCartaoEmoji('💜');
@@ -1373,6 +1544,9 @@ function openEditCartao(cid) {
   if (!c) return;
   document.getElementById('edit-cartao-id').value = cid;
   document.getElementById('nc-name').value = c.name || '';
+  document.getElementById('nc-limite').value = c.limite || '';
+  document.getElementById('nc-fechamento').value = c.fechamentoDia || '28';
+  document.getElementById('nc-vencimento').value = c.vencimentoDia || '05';
   document.getElementById('new-cartao-title').textContent = '✏️ Editar Cartão';
   document.getElementById('btn-delete-cartao').style.display = 'block';
   selectCartaoEmoji(c.emoji || '💜');
@@ -1391,8 +1565,11 @@ function saveNovoCartao() {
   if (!name) { showToast('⚠️ Dê um nome ao cartão'); return; }
   const editId = document.getElementById('edit-cartao-id').value;
   const cid = editId || db.ref('cartoes').push().key;
-  const data = { name, emoji: selectedCartaoEmoji };
-  if (editId && cartoesData[editId]) data.despesas = cartoesData[editId].despesas || {};
+  const limite = parseFloat(document.getElementById('nc-limite').value) || 0;
+  const fechamentoDia = document.getElementById('nc-fechamento').value;
+  const vencimentoDia = document.getElementById('nc-vencimento').value;
+  const data = { name, emoji: selectedCartaoEmoji, limite, fechamentoDia, vencimentoDia };
+  if (editId && cartoesData[editId]) data.faturas = cartoesData[editId].faturas || {};
   db.ref('cartoes/' + cid).set(data)
     .then(() => {
       document.getElementById('new-cartao-modal').classList.remove('open');
@@ -1410,12 +1587,27 @@ function deleteCartao() {
   const cid = document.getElementById('edit-cartao-id').value;
   if (!cid) return;
   const c = cartoesData[cid];
-  const hasDespesas = Object.keys(c?.despesas || {}).length > 0;
-  const msg = hasDespesas
-    ? `Excluir o cartão "${c.name}" e todas as suas ${Object.keys(c.despesas).length} despesas?`
+  let despesaCount = 0;
+  Object.values(c?.faturas || {}).forEach(fat => { despesaCount += Object.keys(fat.despesas || {}).length; });
+  const msg = despesaCount > 0
+    ? `Excluir o cartão "${c.name}" e todas as suas ${despesaCount} despesas (em todas as faturas)?`
     : `Excluir o cartão "${c?.name}"?`;
   if (!confirm(msg)) return;
-  db.ref('cartoes/' + cid).remove()
+
+  // Remove o cartão e também os espelhos criados na tela inicial por suas despesas
+  const updates = { [`cartoes/${cid}`]: null };
+  Object.entries(c?.faturas || {}).forEach(([mk, fat]) => {
+    Object.values(fat.despesas || {}).forEach(d => {
+      if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+        updates[`financas/${mk}/${d.responsavel}/expenses/${d.id}`] = null;
+      } else if (d.responsavel !== 'outros') {
+        updates[`financas/${mk}/vitoria/expenses/${d.id}`] = null;
+        updates[`financas/${mk}/geo/expenses/${d.id}`] = null;
+      }
+    });
+  });
+
+  db.ref().update(updates)
     .then(() => {
       document.getElementById('new-cartao-modal').classList.remove('open');
       showToast('🗑 Cartão excluído!');
@@ -1424,15 +1616,18 @@ function deleteCartao() {
 }
 
 // ─── CARD EXPENSE MODAL ───────────────────────────────────────────
-function openNewCartaoDespesa(cid) {
+// `mk` é a fatura (chave de mês) em que a despesa será lançada — vem do
+// botão "+ Despesa" daquela fatura específica.
+function openNewCartaoDespesa(cid, mk) {
   document.getElementById('cd-edit-id').value = '';
+  document.getElementById('cd-edit-mk').value = '';
   document.getElementById('cd-cartao-id').value = cid;
   document.getElementById('cd-parcel-group').value = '';
   document.getElementById('cartao-despesa-title').textContent = '➕ Nova despesa no cartão';
   document.getElementById('cd-desc').value = '';
   document.getElementById('cd-value').value = '';
   document.getElementById('cd-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('cd-venc').value = '05';
+  document.getElementById('cd-paid').checked = false;
   document.getElementById('cd-is-parcel').checked = false;
   document.getElementById('cd-parcel-fields').style.display = 'none';
   document.getElementById('cd-venc-month-row').style.display = '';
@@ -1441,27 +1636,27 @@ function openNewCartaoDespesa(cid) {
   document.getElementById('btn-delete-cd').style.display = 'none';
   document.getElementById('btn-delete-cd-group').style.display = 'none';
   document.getElementById('cd-outros-nome').value = '';
-  cdPopulateMonthSelect(); // also fills cd-venc-month with default = next month
+  cdPopulateMonthSelect(mk);
   selectCdUser('nenhum');
   document.getElementById('cartao-despesa-modal').classList.add('open');
   document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
 }
 
-function openEditCartaoDespesa(cid, did) {
-  const d = (cartoesData[cid]?.despesas || {})[did];
+function openEditCartaoDespesa(cid, mk, did) {
+  const d = (cartoesData[cid]?.faturas?.[mk]?.despesas || {})[did];
   if (!d) return;
   document.getElementById('cd-edit-id').value = did;
+  document.getElementById('cd-edit-mk').value = mk;
   document.getElementById('cd-cartao-id').value = cid;
   document.getElementById('cd-parcel-group').value = d.parcelGroup || '';
   document.getElementById('cartao-despesa-title').textContent = '✏️ Editar despesa';
   document.getElementById('cd-desc').value = d.desc || '';
   document.getElementById('cd-value').value = d.value || '';
   document.getElementById('cd-date').value = d.date || '';
-  document.getElementById('cd-venc').value = d.venc || '05';
+  document.getElementById('cd-paid').checked = !!d.paid;
   const isParcel = !!d.parcelGroup;
   document.getElementById('cd-is-parcel').checked = isParcel;
-  cdPopulateMonthSelect();
-  cdPopulateVencMonth(d.vencMonth || null);
+  cdPopulateMonthSelect(mk);
   document.getElementById('cd-venc-month-row').style.display = isParcel ? 'none' : '';
   if (isParcel) {
     document.getElementById('cd-parcel-fields').style.display = 'block';
@@ -1496,10 +1691,11 @@ function selectCdUser(u) {
 }
 
 // ─── CARD PARCEL HELPERS ──────────────────────────────────────────
-function cdPopulateMonthSelect() {
-  const now2 = new Date();
-  const year = now2.getFullYear();
-  const month = now2.getMonth();
+// `preselectMk` é a fatura já escolhida (quando a despesa é aberta a partir
+// de um "+ Despesa" dentro de uma fatura específica, ou ao editar).
+function cdPopulateMonthSelect(preselectMk) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
 
   // Parcel start month selector
   const sel = document.getElementById('cd-parcel-month');
@@ -1512,21 +1708,19 @@ function cdPopulateMonthSelect() {
       const opt = document.createElement('option');
       opt.value = key;
       opt.textContent = `${MONTHS[m]} ${y}`;
-      if (i === 0) opt.selected = true;
+      if (preselectMk ? key === preselectMk : i === 0) opt.selected = true;
       sel.appendChild(opt);
     }
   }
 
-  // Vencimento month selector (default = next month, since purchase today goes to next bill)
-  cdPopulateVencMonth();
+  cdPopulateVencMonth(preselectMk);
 }
 
 function cdPopulateVencMonth(selectedKey) {
   const sel = document.getElementById('cd-venc-month');
   if (!sel) return;
-  const now2 = new Date();
-  const year = now2.getFullYear();
-  const month = now2.getMonth();
+  const year = now.getFullYear();
+  const month = now.getMonth();
   sel.innerHTML = '';
   for (let i = -3; i <= 18; i++) {
     let m = (month + i) % 12; if (m < 0) m += 12;
@@ -1535,8 +1729,7 @@ function cdPopulateVencMonth(selectedKey) {
     const opt = document.createElement('option');
     opt.value = key;
     opt.textContent = `${MONTHS[m]} ${y}`;
-    // default: next month (i === 1), or match selectedKey
-    if (selectedKey ? key === selectedKey : i === 1) opt.selected = true;
+    if (selectedKey ? key === selectedKey : i === 0) opt.selected = true;
     sel.appendChild(opt);
   }
 }
@@ -1562,9 +1755,8 @@ function updateCdParcelPreview() {
 // Helper: given a despesa object from cartoes, build home expense mirroring it.
 // `owner` is who this specific mirror belongs to ('vitoria' or 'geo').
 // `value` allows overriding the value (used to split "Casal" expenses in half).
-function buildHomeExpense(despesa, cid, cartaoName, owner, value) {
-  // For the home screen, venc day is the bill day (05, 10, 20 etc.)
-  // The record lives in the financas month key = despesa.vencMonth
+// `vencimentoDia` comes from the card settings (day is no longer per-despesa).
+function buildHomeExpense(despesa, cid, cartaoName, owner, value, vencimentoDia) {
   const isCasal = despesa.responsavel === 'nenhum';
   return {
     id: despesa.id,
@@ -1572,10 +1764,10 @@ function buildHomeExpense(despesa, cid, cartaoName, owner, value) {
     cat: 'cartao',
     desc: `💳 ${cartaoName}: ${despesa.desc}${isCasal ? ' (metade - casal)' : ''}`,
     value: value !== undefined ? value : despesa.value,
-    venc: despesa.venc,         // day (05, 10, 20...)
-    vencMonth: despesa.vencMonth, // month key stored for reference
+    venc: vencimentoDia,          // dia de vencimento definido no cartão
+    vencMonth: despesa.vencMonth, // mês da fatura
     payment: cartaoName,
-    paid: false,
+    paid: !!despesa.paid,
     parcelGroup: despesa.parcelGroup || null,
     parcelCur: despesa.parcelCur || null,
     parcelTotal: despesa.parcelTotal || null,
@@ -1588,56 +1780,52 @@ function buildHomeExpense(despesa, cid, cartaoName, owner, value) {
 // Adds the correct home-mirror update(s) for a despesa into `updates`.
 // If responsavel is 'vitoria' or 'geo', mirrors the full value to that user.
 // If responsavel is 'nenhum' (Casal), splits the value equally between both users.
-function addHomeMirrorUpdates(updates, despesa, cid, cartaoName) {
+function addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia) {
   const mk = despesa.vencMonth;
   if (!mk) return;
   if (despesa.responsavel === 'outros') return; // Não reflete na tela inicial: não é gasto de nenhum dos dois
   if (despesa.responsavel === 'vitoria' || despesa.responsavel === 'geo') {
     updates[`financas/${mk}/${despesa.responsavel}/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, despesa.responsavel, despesa.value);
+      buildHomeExpense(despesa, cid, cartaoName, despesa.responsavel, despesa.value, vencimentoDia);
   } else {
     // Casal: divide o valor igualmente entre os dois usuários
     const half = Math.round((Number(despesa.value || 0) / 2) * 100) / 100;
     updates[`financas/${mk}/vitoria/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, 'vitoria', half);
+      buildHomeExpense(despesa, cid, cartaoName, 'vitoria', half, vencimentoDia);
     updates[`financas/${mk}/geo/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, 'geo', half);
+      buildHomeExpense(despesa, cid, cartaoName, 'geo', half, vencimentoDia);
   }
 }
 
 function saveCartaoDespesa() {
-  const desc    = document.getElementById('cd-desc').value.trim();
-  const value   = parseFloat(document.getElementById('cd-value').value) || 0;
-  const date    = document.getElementById('cd-date').value;
-  const venc    = document.getElementById('cd-venc').value;
-  const vencMonth = document.getElementById('cd-venc-month').value; // ex: "2026_jul"
-  const cid     = document.getElementById('cd-cartao-id').value;
-  const editId  = document.getElementById('cd-edit-id').value;
+  const desc      = document.getElementById('cd-desc').value.trim();
+  const value     = parseFloat(document.getElementById('cd-value').value) || 0;
+  const date      = document.getElementById('cd-date').value;
+  const vencMonth = document.getElementById('cd-venc-month').value; // fatura escolhida, ex: "2026_jul"
+  const cid       = document.getElementById('cd-cartao-id').value;
+  const editId    = document.getElementById('cd-edit-id').value;
+  const editMk    = document.getElementById('cd-edit-mk').value; // fatura onde o registro vivia antes de editar
   const editParcelGroup = document.getElementById('cd-parcel-group').value;
-  const isParcel = document.getElementById('cd-is-parcel').checked;
+  const isParcel  = document.getElementById('cd-is-parcel').checked;
+  const paid      = document.getElementById('cd-paid').checked;
   const outrosNome = document.getElementById('cd-outros-nome').value.trim();
-  const cartaoName = cartoesData[cid]?.name || 'Cartão';
+  const cartao     = cartoesData[cid] || {};
+  const cartaoName = cartao.name || 'Cartão';
+  const vencimentoDia = cartao.vencimentoDia || '05';
 
-  if (!desc)     { showToast('⚠️ Preencha a descrição'); return; }
-  if (!value)    { showToast('⚠️ Informe o valor'); return; }
-  if (!cid)      { showToast('⚠️ Cartão inválido'); return; }
-  if (!vencMonth){ showToast('⚠️ Selecione o mês da fatura'); return; }
+  if (!desc)  { showToast('⚠️ Preencha a descrição'); return; }
+  if (!value) { showToast('⚠️ Informe o valor'); return; }
+  if (!cid)   { showToast('⚠️ Cartão inválido'); return; }
+  if (!isParcel && !vencMonth) { showToast('⚠️ Selecione a fatura'); return; }
 
   const updates = {};
 
-  // ── Helper: remove old home mirror using stored vencMonth ─────────
-  const removeOldMirror = (oldDespesa) => {
-    if (!oldDespesa) return;
-    // Use stored vencMonth if available, fallback to date-based for legacy entries
-    const oldMk = oldDespesa.vencMonth ||
-      (oldDespesa.date
-        ? (() => { const d = new Date(oldDespesa.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })()
-        : null);
-    if (!oldMk) return;
+  // ── Helper: remove home mirror de uma despesa que estava em `oldMk` ──
+  const removeOldMirror = (oldMk, oldDespesa) => {
+    if (!oldDespesa || !oldMk) return;
     if (oldDespesa.responsavel === 'vitoria' || oldDespesa.responsavel === 'geo') {
       updates[`financas/${oldMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
-    } else {
-      // Casal (ou legado 'nenhum'): remove de ambos, caso exista
+    } else if (oldDespesa.responsavel !== 'outros') {
       updates[`financas/${oldMk}/vitoria/expenses/${oldDespesa.id}`] = null;
       updates[`financas/${oldMk}/geo/expenses/${oldDespesa.id}`] = null;
     }
@@ -1646,73 +1834,75 @@ function saveCartaoDespesa() {
   if (!isParcel) {
     // ── Lançamento simples ─────────────────────────────────────────
     if (editId && editParcelGroup) {
-      Object.values(cartoesData[cid]?.despesas || {}).forEach(d => {
-        if (d.parcelGroup === editParcelGroup) {
-          updates[`cartoes/${cid}/despesas/${d.id}`] = null;
-          removeOldMirror(d);
-        }
+      // Estava parcelado e virou lançamento simples: remove todas as parcelas antigas do grupo
+      Object.entries(cartao.faturas || {}).forEach(([fmk, fat]) => {
+        Object.values(fat.despesas || {}).forEach(d => {
+          if (d.parcelGroup === editParcelGroup) {
+            updates[`cartoes/${cid}/faturas/${fmk}/despesas/${d.id}`] = null;
+            removeOldMirror(fmk, d);
+          }
+        });
       });
-    } else if (editId) {
-      const old = (cartoesData[cid]?.despesas || {})[editId];
-      if (old) removeOldMirror(old);
+    } else if (editId && editMk && editMk !== vencMonth) {
+      // Movendo de uma fatura para outra
+      const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
+      updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
+      removeOldMirror(editMk, old);
     }
 
     const did = editId || db.ref().push().key;
-    const despesa = { id: did, desc, value, date, venc, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, parcelGroup: null, reflectido: cdUser !== 'outros' };
-    updates[`cartoes/${cid}/despesas/${did}`] = despesa;
-    // Mirror goes into the bill month (vencMonth), not purchase month
-    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
+    const despesa = { id: did, desc, value, date, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: null, reflectido: cdUser !== 'outros' };
+    updates[`cartoes/${cid}/faturas/${vencMonth}/despesas/${did}`] = despesa;
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
 
   } else if (editId && editParcelGroup) {
-    // ── Editar parcela individual já existente ────────────────────
-    const old = (cartoesData[cid]?.despesas || {})[editId];
+    // ── Editar parcela individual já existente (permanece na mesma fatura) ──
+    const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
+    if (old) removeOldMirror(editMk, old);
     const cur     = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
     const total   = parseInt(document.getElementById('cd-parcel-total').value) || 1;
     const startKey = document.getElementById('cd-parcel-month').value;
-
-    if (old) removeOldMirror(old);
-
-    const despesa = { id: editId, desc, value, date, venc, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'outros' };
-    updates[`cartoes/${cid}/despesas/${editId}`] = despesa;
-    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
+    const despesa = { id: editId, desc, value, date, vencMonth: editMk, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'outros' };
+    updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = despesa;
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
 
   } else {
-    // ── Novo parcelado: criar uma entrada por mês ─────────────────
-    // For parcels the cd-parcel-month IS the first billing month
+    // ── Novo parcelado: cria uma entrada em cada fatura mensal ──────
     const cur      = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
     const total    = parseInt(document.getElementById('cd-parcel-total').value) || 1;
-    const startKey = document.getElementById('cd-parcel-month').value; // first billing month
+    const startKey = document.getElementById('cd-parcel-month').value; // primeira fatura
     const groupId  = db.ref().push().key;
 
     const [sy, smk] = startKey.split('_');
-    let startYear  = parseInt(sy);
-    let startMonth = MONTH_KEYS.indexOf(smk);
-    const remaining = total - cur + 1;
+    const startYear  = parseInt(sy);
+    const startMonth = MONTH_KEYS.indexOf(smk);
+    const remaining  = total - cur + 1;
 
-    if (editId) {
-      const old = (cartoesData[cid]?.despesas || {})[editId];
-      if (old) { updates[`cartoes/${cid}/despesas/${editId}`] = null; removeOldMirror(old); }
+    if (editId && editMk) {
+      const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
+      updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
+      removeOldMirror(editMk, old);
     }
 
     for (let i = 0; i < remaining; i++) {
-      const pNum = cur + i;
-      const mIdx = (startMonth + i) % 12;
+      const pNum  = cur + i;
+      const mIdx  = (startMonth + i) % 12;
       const mYear = startYear + Math.floor((startMonth + i) / 12);
-      const mk = `${mYear}_${MONTH_KEYS[mIdx]}`; // each parcel's billing month
-      const eid = db.ref().push().key;
+      const mk    = `${mYear}_${MONTH_KEYS[mIdx]}`; // fatura de cada parcela
+      const eid   = db.ref().push().key;
       const despesa = {
         id: eid,
         desc: `${desc} (${pNum}/${total})`,
         value, date,
-        venc,
-        vencMonth: mk, // each parcel has its own billing month
+        vencMonth: mk,
         responsavel: cdUser,
         outrosNome: cdUser === 'outros' ? outrosNome : null,
         parcelGroup: groupId, parcelCur: pNum, parcelTotal: total, parcelStartKey: startKey,
+        paid: i === 0 ? paid : false,
         reflectido: cdUser !== 'outros',
       };
-      updates[`cartoes/${cid}/despesas/${eid}`] = despesa;
-      addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
+      updates[`cartoes/${cid}/faturas/${mk}/despesas/${eid}`] = despesa;
+      addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
     }
   }
 
@@ -1725,8 +1915,8 @@ function saveCartaoDespesa() {
       } else if (editId && editParcelGroup) {
         msg = '✅ Parcela atualizada!';
       } else {
-        const cur2  = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
-        const tot2  = parseInt(document.getElementById('cd-parcel-total').value) || 1;
+        const cur2 = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
+        const tot2 = parseInt(document.getElementById('cd-parcel-total').value) || 1;
         msg = `✅ ${tot2 - cur2 + 1} parcelas lançadas!`;
       }
       showToast(msg);
@@ -1737,21 +1927,18 @@ function saveCartaoDespesa() {
 function deleteCartaoDespesaModal() {
   const did = document.getElementById('cd-edit-id').value;
   const cid = document.getElementById('cd-cartao-id').value;
-  if (!did || !cid) return;
+  const mk  = document.getElementById('cd-edit-mk').value;
+  if (!did || !cid || !mk) return;
   if (!confirm('Excluir apenas esta parcela?')) return;
-  const old = (cartoesData[cid]?.despesas || {})[did];
+  const old = (cartoesData[cid]?.faturas?.[mk]?.despesas || {})[did];
   const updates = {};
-  updates[`cartoes/${cid}/despesas/${did}`] = null;
+  updates[`cartoes/${cid}/faturas/${mk}/despesas/${did}`] = null;
   if (old) {
-    const oldMk = old.vencMonth ||
-      (old.date ? (() => { const d = new Date(old.date + 'T12:00:00'); return `${d.getFullYear()}_${MONTH_KEYS[d.getMonth()]}`; })() : null);
-    if (oldMk) {
-      if (old.responsavel === 'vitoria' || old.responsavel === 'geo') {
-        updates[`financas/${oldMk}/${old.responsavel}/expenses/${did}`] = null;
-      } else {
-        updates[`financas/${oldMk}/vitoria/expenses/${did}`] = null;
-        updates[`financas/${oldMk}/geo/expenses/${did}`] = null;
-      }
+    if (old.responsavel === 'vitoria' || old.responsavel === 'geo') {
+      updates[`financas/${mk}/${old.responsavel}/expenses/${did}`] = null;
+    } else if (old.responsavel !== 'outros') {
+      updates[`financas/${mk}/vitoria/expenses/${did}`] = null;
+      updates[`financas/${mk}/geo/expenses/${did}`] = null;
     }
   }
   db.ref().update(updates)
@@ -1760,31 +1947,26 @@ function deleteCartaoDespesaModal() {
 }
 
 function deleteCartaoDespesaGroup() {
-  const did = document.getElementById('cd-edit-id').value;
   const cid = document.getElementById('cd-cartao-id').value;
   const groupId = document.getElementById('cd-parcel-group').value;
   if (!groupId || !cid) return;
-  if (!confirm('Excluir TODAS as parcelas deste grupo?\nIsso removerá os lançamentos em todos os meses.')) return;
+  if (!confirm('Excluir TODAS as parcelas deste grupo?\nIsso removerá os lançamentos em todas as faturas.')) return;
 
   const updates = {};
-  // Remove from cartoes
-  Object.values(cartoesData[cid]?.despesas || {}).forEach(d => {
-    if (d.parcelGroup === groupId) {
-      updates[`cartoes/${cid}/despesas/${d.id}`] = null;
-      // Remove mirror from financas
-      const dMk = d.vencMonth ||
-        (d.date ? (() => { const dt = new Date(d.date + 'T12:00:00'); return `${dt.getFullYear()}_${MONTH_KEYS[dt.getMonth()]}`; })() : null);
-      if (dMk) {
+  Object.entries(cartoesData[cid]?.faturas || {}).forEach(([mk, fat]) => {
+    Object.values(fat.despesas || {}).forEach(d => {
+      if (d.parcelGroup === groupId) {
+        updates[`cartoes/${cid}/faturas/${mk}/despesas/${d.id}`] = null;
         if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
-          updates[`financas/${dMk}/${d.responsavel}/expenses/${d.id}`] = null;
-        } else {
-          updates[`financas/${dMk}/vitoria/expenses/${d.id}`] = null;
-          updates[`financas/${dMk}/geo/expenses/${d.id}`] = null;
+          updates[`financas/${mk}/${d.responsavel}/expenses/${d.id}`] = null;
+        } else if (d.responsavel !== 'outros') {
+          updates[`financas/${mk}/vitoria/expenses/${d.id}`] = null;
+          updates[`financas/${mk}/geo/expenses/${d.id}`] = null;
         }
       }
-    }
+    });
   });
-  // Also search financas globally for any mirror with this parcelGroup (safety net)
+  // Rede de segurança: procura globalmente por espelhos órfãos com este parcelGroup
   db.ref('financas').once('value').then(snap => {
     const allData = snap.val() || {};
     Object.entries(allData).forEach(([mk, mData]) => {
