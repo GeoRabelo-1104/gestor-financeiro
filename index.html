@@ -701,7 +701,30 @@ function catById(id){ return CATEGORIES.find(c=>c.id===id)||CATEGORIES[CATEGORIE
 
 // ─── STATE ────────────────────────────────────────────────────────
 const now = new Date();
-let state = { user:'vitoria', year:now.getFullYear(), month:now.getMonth(), filterCat:'all' };
+
+// Lembra em qual usuário e mês a pessoa estava navegando na tela inicial,
+// para reabrir o app sempre de onde parou (em vez de sempre voltar para
+// o mês real atual).
+function loadSavedHomeState(){
+  try {
+    const raw = localStorage.getItem('financas_home_state');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+function saveHomeState(){
+  try {
+    localStorage.setItem('financas_home_state', JSON.stringify({
+      user: state.user, year: state.year, month: state.month
+    }));
+  } catch(e){}
+}
+const savedHomeState = loadSavedHomeState();
+let state = {
+  user: savedHomeState?.user || 'vitoria',
+  year: savedHomeState?.year ?? now.getFullYear(),
+  month: savedHomeState?.month ?? now.getMonth(),
+  filterCat: 'all'
+};
 let monthData = null;
 let activeRef = null;
 let activeCallback = null;
@@ -734,7 +757,12 @@ function attachListener(){
       if(!monthData[u].expenses) monthData[u].expenses = {};
     });
     setSyncStatus('ok');
-    render();
+    // monthData é sempre atualizado (para já vir pronto ao trocar de tela),
+    // mas só redesenha a tela inicial se ela estiver realmente visível.
+    // Sem essa checagem, ao lançar uma despesa de cartão para Vitória/Geovanne/Casal
+    // (que também grava um espelho em "financas"), este listener disparava e
+    // sobrescrevia o conteúdo da aba Cartões com a tela inicial.
+    if(currentScreen === 'home') render();
   };
   activeRef.on('value', activeCallback, function(err){
     console.error(err);
@@ -942,16 +970,18 @@ function renderExpense(e){
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────
-function switchUser(u){ state.user=u; state.filterCat='all'; render(); }
+function switchUser(u){ state.user=u; state.filterCat='all'; saveHomeState(); render(); }
 function filterCat(c){ state.filterCat=c; render(); }
 function prevMonth(){
   state.month--; if(state.month<0){state.month=11;state.year--;}
   state.filterCat='all';
+  saveHomeState();
   attachListener();
 }
 function nextMonth(){
   state.month++; if(state.month>11){state.month=0;state.year++;}
   state.filterCat='all';
+  saveHomeState();
   attachListener();
 }
 
@@ -1266,6 +1296,8 @@ let cartoesRef = null;
 let cartoesCallback = null;
 let selectedCartaoEmoji = '💜';
 let cdUser = 'nenhum';
+let openFaturas = new Set();      // chaves `${cid}::${mk}` das faturas expandidas
+let collapsedCartoes = new Set(); // ids de cartões cuja lista de faturas está recolhida
 
 function switchScreen(screen) {
   currentScreen = screen;
@@ -1427,12 +1459,13 @@ function renderCartoes() {
         </div>`;
       }
 
-      h += `<div class="fatura-list" id="cdlist-${cid}">`;
+      h += `<div class="fatura-list" id="cdlist-${cid}" style="${collapsedCartoes.has(cid) ? 'display:none' : ''}">`;
       faturaKeys.forEach(mk => {
         const fat = (c.faturas || {})[mk] || {};
         const despesasArr = Object.values(fat.despesas || {}).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const totalFat = despesasArr.reduce((s, d) => s + Number(d.value || 0), 0);
         const isCur = mk === curMk;
+        const isOpen = openFaturas.has(`${cid}::${mk}`);
 
         h += `
         <div class="fatura-block">
@@ -1445,9 +1478,9 @@ function renderCartoes() {
               <div class="fatura-total">${fmt(totalFat)}</div>
               <span class="fatura-status ${fat.paga ? 'paga-badge' : 'aberta'}">${fat.paga ? 'Paga' : 'Aberta'}</span>
             </div>
-            <span class="fatura-chevron" id="chev-${cid}-${mk}">▾</span>
+            <span class="fatura-chevron ${isOpen ? 'open' : ''}" id="chev-${cid}-${mk}">▾</span>
           </div>
-          <div class="fatura-body" id="fbody-${cid}-${mk}">
+          <div class="fatura-body ${isOpen ? 'open' : ''}" id="fbody-${cid}-${mk}">
             <div class="fatura-actions">
               <button class="btn-cartao-action" onclick="event.stopPropagation();openNewCartaoDespesa('${cid}','${mk}')">+ Despesa</button>
               <button class="btn-cartao-action" onclick="event.stopPropagation();toggleFaturaPaga('${cid}','${mk}',${!!fat.paga})">${fat.paga ? '↩️ Reabrir fatura' : '✅ Marcar fatura como paga'}</button>
@@ -1492,16 +1525,20 @@ function renderCartoes() {
 }
 
 function toggleCartaoBlock(cid) {
+  if (collapsedCartoes.has(cid)) collapsedCartoes.delete(cid);
+  else collapsedCartoes.add(cid);
   const list = document.getElementById('cdlist-' + cid);
-  if (list) list.style.display = list.style.display === 'none' ? '' : 'none';
+  if (list) list.style.display = collapsedCartoes.has(cid) ? 'none' : '';
 }
 
 function toggleFaturaBlock(cid, mk) {
+  const key = `${cid}::${mk}`;
+  if (openFaturas.has(key)) openFaturas.delete(key);
+  else openFaturas.add(key);
   const body = document.getElementById(`fbody-${cid}-${mk}`);
   const chev = document.getElementById(`chev-${cid}-${mk}`);
-  if (!body) return;
-  body.classList.toggle('open');
-  if (chev) chev.classList.toggle('open');
+  if (body) body.classList.toggle('open', openFaturas.has(key));
+  if (chev) chev.classList.toggle('open', openFaturas.has(key));
 }
 
 function toggleFaturaPaga(cid, mk, cur) {
@@ -1843,11 +1880,18 @@ function saveCartaoDespesa() {
           }
         });
       });
-    } else if (editId && editMk && editMk !== vencMonth) {
-      // Movendo de uma fatura para outra
-      const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
-      updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
-      removeOldMirror(editMk, old);
+    } else if (editId) {
+      // Edição de um lançamento simples já existente: sempre limpa o espelho
+      // antigo primeiro. Isso é essencial quando o responsável muda (ex:
+      // "Casal" → só uma pessoa), pois o espelho antigo estava dividido
+      // entre os dois e precisa sumir da tela de quem deixou de ser responsável.
+      const oldMk = editMk || vencMonth;
+      const old = (cartao.faturas?.[oldMk]?.despesas || {})[editId];
+      if (old) removeOldMirror(oldMk, old);
+      if (editMk && editMk !== vencMonth) {
+        // além de trocar o responsável, também mudou de fatura
+        updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
+      }
     }
 
     const did = editId || db.ref().push().key;
