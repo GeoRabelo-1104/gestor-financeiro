@@ -548,6 +548,10 @@
       <input type="text" class="form-input" id="cd-outros-nome" placeholder="Ex: irmão, amigo, sogra...">
     </div>
     <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <div class="cat-picker" id="cd-cat-picker"></div>
+    </div>
+    <div class="form-group">
       <label class="form-label">Descrição</label>
       <input type="text" class="form-input" id="cd-desc" placeholder="Ex: Mercado, Assinatura, Roupa...">
     </div>
@@ -563,7 +567,24 @@
     </div>
     <div class="form-group" id="cd-venc-month-row">
       <label class="form-label">Fatura (mês)</label>
-      <select class="form-select" id="cd-venc-month"></select>
+      <select class="form-select" id="cd-venc-month" onchange="cdOnVencMonthChange()"></select>
+    </div>
+    <div class="form-group" id="cd-home-mirror-group">
+      <label class="form-label">💡 Refletir na tela inicial em</label>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Salário</label>
+          <select class="form-select" id="cd-home-bucket" onchange="cdHomeManual=true">
+            <option value="20">Dia 20 (Adiantamento)</option>
+            <option value="05">Dia 05 (Restante)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Mês</label>
+          <select class="form-select" id="cd-home-month" onchange="cdHomeManual=true"></select>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Calculado automaticamente a partir do vencimento da fatura — ajuste se quiser que caia em outro mês/salário.</div>
     </div>
     <div class="toggle-row">
       <span class="toggle-label">Já pago?</span>
@@ -1079,6 +1100,19 @@ function renderCatPicker(){
     </button>`).join('');
 }
 function selectCat(id){ selCat=id; renderCatPicker(); }
+
+// Mesmo seletor de categorias da tela inicial, reaproveitado no lançamento
+// de despesas de cartão.
+let selCdCat = 'cartao';
+function renderCdCatPicker(){
+  const el = document.getElementById('cd-cat-picker');
+  if (!el) return;
+  el.innerHTML = CATEGORIES.map(c=>
+    `<button type="button" class="cat-btn ${c.id===selCdCat?'selected':''}" onclick="selectCdCat('${c.id}')">
+      <span class="emoji">${c.emoji}</span>${c.label}
+    </button>`).join('');
+}
+function selectCdCat(id){ selCdCat=id; renderCdCatPicker(); }
 function selectFormUser(u){ formUser=u; updateUBtns(); }
 function updateUBtns(){
   ['vitoria','geo'].forEach(u=>{
@@ -1296,6 +1330,7 @@ let cartoesRef = null;
 let cartoesCallback = null;
 let selectedCartaoEmoji = '💜';
 let cdUser = 'nenhum';
+let cdHomeManual = false; // true quando a pessoa ajustou manualmente o mês/salário do espelho
 let openFaturas = new Set();      // chaves `${cid}::${mk}` das faturas expandidas
 let collapsedCartoes = new Set(); // ids de cartões cuja lista de faturas está recolhida
 
@@ -1330,6 +1365,7 @@ function attachCartoesListener() {
   cartoesCallback = function(snap) {
     cartoesData = snap.val() || {};
     migrateLegacyCartoes(cartoesData);
+    migrateHomeMirrors(cartoesData);
     if (currentScreen === 'cards') renderCartoes();
     // Also re-render home if open to reflect card totals
     if (currentScreen === 'home' && monthData) render();
@@ -1371,6 +1407,51 @@ function diaLabel(dia) { return dia === 'ultimo' ? 'no último dia' : `dia ${dia
 function mkLabel(mk) {
   const [y, mk2] = mk.split('_');
   return `${MONTHS[MONTH_KEYS.indexOf(mk2)]} ${y}`;
+}
+
+// ─── MIGRAÇÃO: define homeMk/homeBucket para despesas criadas antes desta
+// funcionalidade existir, e corrige o espelho que já estava na tela inicial
+// (removendo do mês errado e recriando no mês/dia calculado corretamente).
+// Roda uma única vez por despesa: assim que ela ganha homeMk, não é mais
+// tocada por esta função (respeitando qualquer ajuste manual feito depois).
+function migrateHomeMirrors(data) {
+  const updates = {};
+  Object.entries(data || {}).forEach(([cid, c]) => {
+    const vencimentoDia = c.vencimentoDia || '05';
+    const cartaoName = c.name || 'Cartão';
+    Object.entries(c.faturas || {}).forEach(([mk, fat]) => {
+      Object.values(fat.despesas || {}).forEach(d => {
+        if (d.homeMk) return; // já migrado (ou já ajustado manualmente)
+        const def = computeDefaultHomeMirror(vencimentoDia, mk);
+        updates[`cartoes/${cid}/faturas/${mk}/despesas/${d.id}/homeMk`] = def.homeMk;
+        updates[`cartoes/${cid}/faturas/${mk}/despesas/${d.id}/homeBucket`] = def.homeBucket;
+        if (d.responsavel === 'outros') return; // nunca teve espelho
+        // Remove o espelho antigo (gravado erroneamente na chave da fatura)
+        const oldMk = d.vencMonth || mk;
+        if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+          updates[`financas/${oldMk}/${d.responsavel}/expenses/${d.id}`] = null;
+        } else if (d.responsavel !== 'outros') {
+          updates[`financas/${oldMk}/vitoria/expenses/${d.id}`] = null;
+          updates[`financas/${oldMk}/geo/expenses/${d.id}`] = null;
+        }
+        // Recria no lugar certo
+        const nd = { ...d, homeMk: def.homeMk, homeBucket: def.homeBucket };
+        if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+          updates[`financas/${def.homeMk}/${d.responsavel}/expenses/${d.id}`] =
+            buildHomeExpense(nd, cid, cartaoName, d.responsavel, d.value);
+        } else {
+          const half = Math.round((Number(d.value || 0) / 2) * 100) / 100;
+          updates[`financas/${def.homeMk}/vitoria/expenses/${d.id}`] =
+            buildHomeExpense(nd, cid, cartaoName, 'vitoria', half);
+          updates[`financas/${def.homeMk}/geo/expenses/${d.id}`] =
+            buildHomeExpense(nd, cid, cartaoName, 'geo', half);
+        }
+      });
+    });
+  });
+  if (Object.keys(updates).length) {
+    db.ref().update(updates).catch(err => console.error('Erro na migração de espelhos:', err));
+  }
 }
 
 // Gera as chaves de mês (faturas) a exibir para um cartão: todas as que já
@@ -1501,6 +1582,7 @@ function renderCartoes() {
                 <div class="cd-desc">${escHtml(d.desc || '—')}</div>
                 <div class="cd-meta">
                   <span>${userLabel}</span>
+                  <span>${catById(d.cat || 'cartao').emoji} ${catById(d.cat || 'cartao').label}</span>
                   <span>🛒 ${dateFormatted}</span>
                   ${d.parcelGroup ? `<span class="cd-badge">${d.parcelCur}/${d.parcelTotal}</span>` : ''}
                   ${d.paid ? '<span class="paid-badge">Pago</span>' : '<span class="unpaid-badge">A pagar</span>'}
@@ -1635,11 +1717,13 @@ function deleteCartao() {
   const updates = { [`cartoes/${cid}`]: null };
   Object.entries(c?.faturas || {}).forEach(([mk, fat]) => {
     Object.values(fat.despesas || {}).forEach(d => {
+      const homeMk = d.homeMk || d.vencMonth;
+      if (!homeMk) return;
       if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
-        updates[`financas/${mk}/${d.responsavel}/expenses/${d.id}`] = null;
+        updates[`financas/${homeMk}/${d.responsavel}/expenses/${d.id}`] = null;
       } else if (d.responsavel !== 'outros') {
-        updates[`financas/${mk}/vitoria/expenses/${d.id}`] = null;
-        updates[`financas/${mk}/geo/expenses/${d.id}`] = null;
+        updates[`financas/${homeMk}/vitoria/expenses/${d.id}`] = null;
+        updates[`financas/${homeMk}/geo/expenses/${d.id}`] = null;
       }
     });
   });
@@ -1673,8 +1757,15 @@ function openNewCartaoDespesa(cid, mk) {
   document.getElementById('btn-delete-cd').style.display = 'none';
   document.getElementById('btn-delete-cd-group').style.display = 'none';
   document.getElementById('cd-outros-nome').value = '';
+  selCdCat = 'cartao';
+  renderCdCatPicker();
+  cdHomeManual = false;
   cdPopulateMonthSelect(mk);
+  const vencimentoDia0 = cartoesData[cid]?.vencimentoDia || '05';
+  const defHome = computeDefaultHomeMirror(vencimentoDia0, mk || `${now.getFullYear()}_${MONTH_KEYS[now.getMonth()]}`);
+  cdSetHomeFields(defHome.homeMk, defHome.homeBucket);
   selectCdUser('nenhum');
+  cdUpdateHomeMirrorVisibility();
   document.getElementById('cartao-despesa-modal').classList.add('open');
   document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
 }
@@ -1691,6 +1782,8 @@ function openEditCartaoDespesa(cid, mk, did) {
   document.getElementById('cd-value').value = d.value || '';
   document.getElementById('cd-date').value = d.date || '';
   document.getElementById('cd-paid').checked = !!d.paid;
+  selCdCat = d.cat || 'cartao';
+  renderCdCatPicker();
   const isParcel = !!d.parcelGroup;
   document.getElementById('cd-is-parcel').checked = isParcel;
   cdPopulateMonthSelect(mk);
@@ -1711,7 +1804,12 @@ function openEditCartaoDespesa(cid, mk, did) {
   document.getElementById('btn-delete-cd').textContent = isParcel ? '🗑 Excluir só esta parcela' : '🗑 Excluir despesa';
   document.getElementById('btn-delete-cd-group').style.display = isParcel ? 'block' : 'none';
   document.getElementById('cd-outros-nome').value = d.outrosNome || '';
+  cdHomeManual = true; // preserva o valor já salvo (ou calculado) sem recalcular ao trocar a fatura
+  const vencimentoDia1 = cartoesData[cid]?.vencimentoDia || '05';
+  const savedHome = d.homeMk ? { homeMk: d.homeMk, homeBucket: d.homeBucket || '05' } : computeDefaultHomeMirror(vencimentoDia1, mk);
+  cdSetHomeFields(savedHome.homeMk, savedHome.homeBucket);
   selectCdUser(d.responsavel || 'nenhum');
+  cdUpdateHomeMirrorVisibility();
   document.getElementById('cartao-despesa-modal').classList.add('open');
   document.querySelector('#cartao-despesa-modal .modal').scrollTop = 0;
 }
@@ -1725,6 +1823,7 @@ function selectCdUser(u) {
   });
   const nomeGroup = document.getElementById('cd-outros-nome-group');
   if (nomeGroup) nomeGroup.style.display = cdUser === 'outros' ? '' : 'none';
+  cdUpdateHomeMirrorVisibility();
 }
 
 // ─── CARD PARCEL HELPERS ──────────────────────────────────────────
@@ -1771,11 +1870,75 @@ function cdPopulateVencMonth(selectedKey) {
   }
 }
 
+// ─── REFLEXO NA TELA INICIAL (mês + salário dia 20/05) ────────────
+// Por padrão, a tela inicial mostra o balde "Dia 20" de um mês M como
+// sendo o salário recebido no dia 20 do mês anterior a M. Ou seja: uma
+// fatura de cartão que vence dia 20/08 deveria refletir no balde "Dia 20"
+// do mês de SETEMBRO na tela inicial (não em agosto). Esta função calcula
+// esse padrão automaticamente, mas o usuário pode ajustar manualmente.
+function computeDefaultHomeMirror(vencimentoDia, mk) {
+  if (vencimentoDia === '20') {
+    const [y, mkk] = mk.split('_');
+    let idx = MONTH_KEYS.indexOf(mkk) + 1;
+    let yy = parseInt(y);
+    if (idx > 11) { idx = 0; yy++; }
+    return { homeMk: `${yy}_${MONTH_KEYS[idx]}`, homeBucket: '20' };
+  }
+  return { homeMk: mk, homeBucket: '05' };
+}
+
+function cdPopulateHomeMonth(selectedKey) {
+  const sel = document.getElementById('cd-home-month');
+  if (!sel) return;
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  sel.innerHTML = '';
+  for (let i = -3; i <= 19; i++) {
+    let m = (month + i) % 12; if (m < 0) m += 12;
+    const y = year + Math.floor((month + i) / 12);
+    const key = `${y}_${MONTH_KEYS[m]}`;
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = `${MONTHS[m]} ${y}`;
+    if (selectedKey ? key === selectedKey : i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function cdSetHomeFields(mk, bucket) {
+  cdPopulateHomeMonth(mk);
+  const sel = document.getElementById('cd-home-bucket');
+  if (sel) sel.value = bucket || '05';
+}
+
+// Chamado quando a fatura (mês) muda: recalcula o padrão do espelho,
+// a menos que a pessoa já tenha ajustado manualmente.
+function cdOnVencMonthChange() {
+  if (cdHomeManual) return;
+  const cid = document.getElementById('cd-cartao-id').value;
+  const vencimentoDia = cartoesData[cid]?.vencimentoDia || '05';
+  const mk = document.getElementById('cd-venc-month').value;
+  const def = computeDefaultHomeMirror(vencimentoDia, mk);
+  cdSetHomeFields(def.homeMk, def.homeBucket);
+}
+
+// Esconde o bloco de espelho quando não há espelho a configurar:
+// "Outros" nunca espelha, e no lançamento de VÁRIAS parcelas novas de uma
+// vez o mês de cada parcela é calculado automaticamente uma a uma.
+function cdUpdateHomeMirrorVisibility() {
+  const group = document.getElementById('cd-home-mirror-group');
+  if (!group) return;
+  const isBulkNewParcel = document.getElementById('cd-is-parcel').checked && !document.getElementById('cd-parcel-group').value;
+  const isOutros = cdUser === 'outros';
+  group.style.display = (isBulkNewParcel || isOutros) ? 'none' : '';
+}
+
 function toggleCdParcelFields() {
   const on = document.getElementById('cd-is-parcel').checked;
   document.getElementById('cd-parcel-fields').style.display = on ? 'block' : 'none';
   // When parceled, billing month is set per-parcel via cd-parcel-month; hide single venc-month
   document.getElementById('cd-venc-month-row').style.display = on ? 'none' : '';
+  cdUpdateHomeMirrorVisibility();
   if (on) updateCdParcelPreview();
 }
 
@@ -1793,16 +1956,16 @@ function updateCdParcelPreview() {
 // `owner` is who this specific mirror belongs to ('vitoria' or 'geo').
 // `value` allows overriding the value (used to split "Casal" expenses in half).
 // `vencimentoDia` comes from the card settings (day is no longer per-despesa).
-function buildHomeExpense(despesa, cid, cartaoName, owner, value, vencimentoDia) {
+function buildHomeExpense(despesa, cid, cartaoName, owner, value) {
   const isCasal = despesa.responsavel === 'nenhum';
   return {
     id: despesa.id,
     _owner: owner,
-    cat: 'cartao',
+    cat: despesa.cat || 'cartao',
     desc: `💳 ${cartaoName}: ${despesa.desc}${isCasal ? ' (metade - casal)' : ''}`,
     value: value !== undefined ? value : despesa.value,
-    venc: vencimentoDia,          // dia de vencimento definido no cartão
-    vencMonth: despesa.vencMonth, // mês da fatura
+    venc: despesa.homeBucket || '05',   // balde escolhido pelo usuário (Dia 20 ou Dia 05)
+    vencMonth: despesa.homeMk,          // mês da tela inicial escolhido pelo usuário
     payment: cartaoName,
     paid: !!despesa.paid,
     parcelGroup: despesa.parcelGroup || null,
@@ -1817,20 +1980,20 @@ function buildHomeExpense(despesa, cid, cartaoName, owner, value, vencimentoDia)
 // Adds the correct home-mirror update(s) for a despesa into `updates`.
 // If responsavel is 'vitoria' or 'geo', mirrors the full value to that user.
 // If responsavel is 'nenhum' (Casal), splits the value equally between both users.
-function addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia) {
-  const mk = despesa.vencMonth;
+function addHomeMirrorUpdates(updates, despesa, cid, cartaoName) {
+  const mk = despesa.homeMk;
   if (!mk) return;
   if (despesa.responsavel === 'outros') return; // Não reflete na tela inicial: não é gasto de nenhum dos dois
   if (despesa.responsavel === 'vitoria' || despesa.responsavel === 'geo') {
     updates[`financas/${mk}/${despesa.responsavel}/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, despesa.responsavel, despesa.value, vencimentoDia);
+      buildHomeExpense(despesa, cid, cartaoName, despesa.responsavel, despesa.value);
   } else {
     // Casal: divide o valor igualmente entre os dois usuários
     const half = Math.round((Number(despesa.value || 0) / 2) * 100) / 100;
     updates[`financas/${mk}/vitoria/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, 'vitoria', half, vencimentoDia);
+      buildHomeExpense(despesa, cid, cartaoName, 'vitoria', half);
     updates[`financas/${mk}/geo/expenses/${despesa.id}`] =
-      buildHomeExpense(despesa, cid, cartaoName, 'geo', half, vencimentoDia);
+      buildHomeExpense(despesa, cid, cartaoName, 'geo', half);
   }
 }
 
@@ -1839,6 +2002,8 @@ function saveCartaoDespesa() {
   const value     = parseFloat(document.getElementById('cd-value').value) || 0;
   const date      = document.getElementById('cd-date').value;
   const vencMonth = document.getElementById('cd-venc-month').value; // fatura escolhida, ex: "2026_jul"
+  const homeMk     = document.getElementById('cd-home-month').value;  // mês da tela inicial, escolhido pelo usuário
+  const homeBucket = document.getElementById('cd-home-bucket').value; // '20' ou '05'
   const cid       = document.getElementById('cd-cartao-id').value;
   const editId    = document.getElementById('cd-edit-id').value;
   const editMk    = document.getElementById('cd-edit-mk').value; // fatura onde o registro vivia antes de editar
@@ -1857,14 +2022,17 @@ function saveCartaoDespesa() {
 
   const updates = {};
 
-  // ── Helper: remove home mirror de uma despesa que estava em `oldMk` ──
-  const removeOldMirror = (oldMk, oldDespesa) => {
-    if (!oldDespesa || !oldMk) return;
+  // ── Helper: remove o espelho de uma despesa a partir do que ELA MESMA
+  // guarda (homeMk/homeBucket), nunca a partir da fatura do cartão ──
+  const removeOldMirror = (oldDespesa) => {
+    if (!oldDespesa) return;
+    const oldHomeMk = oldDespesa.homeMk || oldDespesa.vencMonth; // fallback p/ despesas antigas
+    if (!oldHomeMk) return;
     if (oldDespesa.responsavel === 'vitoria' || oldDespesa.responsavel === 'geo') {
-      updates[`financas/${oldMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
+      updates[`financas/${oldHomeMk}/${oldDespesa.responsavel}/expenses/${oldDespesa.id}`] = null;
     } else if (oldDespesa.responsavel !== 'outros') {
-      updates[`financas/${oldMk}/vitoria/expenses/${oldDespesa.id}`] = null;
-      updates[`financas/${oldMk}/geo/expenses/${oldDespesa.id}`] = null;
+      updates[`financas/${oldHomeMk}/vitoria/expenses/${oldDespesa.id}`] = null;
+      updates[`financas/${oldHomeMk}/geo/expenses/${oldDespesa.id}`] = null;
     }
   };
 
@@ -1876,42 +2044,44 @@ function saveCartaoDespesa() {
         Object.values(fat.despesas || {}).forEach(d => {
           if (d.parcelGroup === editParcelGroup) {
             updates[`cartoes/${cid}/faturas/${fmk}/despesas/${d.id}`] = null;
-            removeOldMirror(fmk, d);
+            removeOldMirror(d);
           }
         });
       });
     } else if (editId) {
       // Edição de um lançamento simples já existente: sempre limpa o espelho
-      // antigo primeiro. Isso é essencial quando o responsável muda (ex:
-      // "Casal" → só uma pessoa), pois o espelho antigo estava dividido
-      // entre os dois e precisa sumir da tela de quem deixou de ser responsável.
+      // antigo primeiro. Isso é essencial quando o responsável (ou o mês/dia
+      // escolhido para a tela inicial) muda.
       const oldMk = editMk || vencMonth;
       const old = (cartao.faturas?.[oldMk]?.despesas || {})[editId];
-      if (old) removeOldMirror(oldMk, old);
+      if (old) removeOldMirror(old);
       if (editMk && editMk !== vencMonth) {
-        // além de trocar o responsável, também mudou de fatura
+        // além de trocar algo, também mudou de fatura
         updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
       }
     }
 
     const did = editId || db.ref().push().key;
-    const despesa = { id: did, desc, value, date, vencMonth, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: null, reflectido: cdUser !== 'outros' };
+    const despesa = { id: did, desc, value, date, vencMonth, homeMk, homeBucket, cat: selCdCat, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: null, reflectido: cdUser !== 'outros' };
     updates[`cartoes/${cid}/faturas/${vencMonth}/despesas/${did}`] = despesa;
-    addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
 
   } else if (editId && editParcelGroup) {
     // ── Editar parcela individual já existente (permanece na mesma fatura) ──
     const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
-    if (old) removeOldMirror(editMk, old);
+    if (old) removeOldMirror(old);
     const cur     = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
     const total   = parseInt(document.getElementById('cd-parcel-total').value) || 1;
     const startKey = document.getElementById('cd-parcel-month').value;
-    const despesa = { id: editId, desc, value, date, vencMonth: editMk, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'outros' };
+    const despesa = { id: editId, desc, value, date, vencMonth: editMk, homeMk, homeBucket, cat: selCdCat, responsavel: cdUser, outrosNome: cdUser === 'outros' ? outrosNome : null, paid, parcelGroup: editParcelGroup, parcelCur: cur, parcelTotal: total, parcelStartKey: startKey, reflectido: cdUser !== 'outros' };
     updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = despesa;
-    addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
+    addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
 
   } else {
     // ── Novo parcelado: cria uma entrada em cada fatura mensal ──────
+    // Cada parcela cai em uma fatura (mês) diferente, então o mês/dia da
+    // tela inicial de cada uma é calculado automaticamente a partir do
+    // vencimento do cartão (não dá pra escolher manualmente parcela a parcela).
     const cur      = parseInt(document.getElementById('cd-parcel-cur').value) || 1;
     const total    = parseInt(document.getElementById('cd-parcel-total').value) || 1;
     const startKey = document.getElementById('cd-parcel-month').value; // primeira fatura
@@ -1925,7 +2095,7 @@ function saveCartaoDespesa() {
     if (editId && editMk) {
       const old = (cartao.faturas?.[editMk]?.despesas || {})[editId];
       updates[`cartoes/${cid}/faturas/${editMk}/despesas/${editId}`] = null;
-      removeOldMirror(editMk, old);
+      removeOldMirror(old);
     }
 
     for (let i = 0; i < remaining; i++) {
@@ -1933,12 +2103,16 @@ function saveCartaoDespesa() {
       const mIdx  = (startMonth + i) % 12;
       const mYear = startYear + Math.floor((startMonth + i) / 12);
       const mk    = `${mYear}_${MONTH_KEYS[mIdx]}`; // fatura de cada parcela
+      const defHome = computeDefaultHomeMirror(vencimentoDia, mk);
       const eid   = db.ref().push().key;
       const despesa = {
         id: eid,
         desc: `${desc} (${pNum}/${total})`,
         value, date,
         vencMonth: mk,
+        homeMk: defHome.homeMk,
+        homeBucket: defHome.homeBucket,
+        cat: selCdCat,
         responsavel: cdUser,
         outrosNome: cdUser === 'outros' ? outrosNome : null,
         parcelGroup: groupId, parcelCur: pNum, parcelTotal: total, parcelStartKey: startKey,
@@ -1946,7 +2120,7 @@ function saveCartaoDespesa() {
         reflectido: cdUser !== 'outros',
       };
       updates[`cartoes/${cid}/faturas/${mk}/despesas/${eid}`] = despesa;
-      addHomeMirrorUpdates(updates, despesa, cid, cartaoName, vencimentoDia);
+      addHomeMirrorUpdates(updates, despesa, cid, cartaoName);
     }
   }
 
@@ -1978,11 +2152,14 @@ function deleteCartaoDespesaModal() {
   const updates = {};
   updates[`cartoes/${cid}/faturas/${mk}/despesas/${did}`] = null;
   if (old) {
-    if (old.responsavel === 'vitoria' || old.responsavel === 'geo') {
-      updates[`financas/${mk}/${old.responsavel}/expenses/${did}`] = null;
-    } else if (old.responsavel !== 'outros') {
-      updates[`financas/${mk}/vitoria/expenses/${did}`] = null;
-      updates[`financas/${mk}/geo/expenses/${did}`] = null;
+    const homeMk = old.homeMk || old.vencMonth;
+    if (homeMk) {
+      if (old.responsavel === 'vitoria' || old.responsavel === 'geo') {
+        updates[`financas/${homeMk}/${old.responsavel}/expenses/${did}`] = null;
+      } else if (old.responsavel !== 'outros') {
+        updates[`financas/${homeMk}/vitoria/expenses/${did}`] = null;
+        updates[`financas/${homeMk}/geo/expenses/${did}`] = null;
+      }
     }
   }
   db.ref().update(updates)
@@ -2001,11 +2178,14 @@ function deleteCartaoDespesaGroup() {
     Object.values(fat.despesas || {}).forEach(d => {
       if (d.parcelGroup === groupId) {
         updates[`cartoes/${cid}/faturas/${mk}/despesas/${d.id}`] = null;
-        if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
-          updates[`financas/${mk}/${d.responsavel}/expenses/${d.id}`] = null;
-        } else if (d.responsavel !== 'outros') {
-          updates[`financas/${mk}/vitoria/expenses/${d.id}`] = null;
-          updates[`financas/${mk}/geo/expenses/${d.id}`] = null;
+        const homeMk = d.homeMk || d.vencMonth;
+        if (homeMk) {
+          if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
+            updates[`financas/${homeMk}/${d.responsavel}/expenses/${d.id}`] = null;
+          } else if (d.responsavel !== 'outros') {
+            updates[`financas/${homeMk}/vitoria/expenses/${d.id}`] = null;
+            updates[`financas/${homeMk}/geo/expenses/${d.id}`] = null;
+          }
         }
       }
     });
