@@ -943,7 +943,7 @@ function render(){
   if(!monthData){ document.getElementById('main-content').innerHTML=`<div class="loading-screen"><div class="spinner"></div><span>Carregando...</span></div>`; return; }
 
   const ud     = monthData[state.user];
-  const allExp = Object.values(ud.expenses||{});
+  const allExp = Object.values(ud.expenses||{}).filter(e=>!e.fixedSkipped);
   const filtered = state.filterCat==='all' ? allExp : allExp.filter(e=>e.cat===state.filterCat);
   // Qualquer vencimento diferente de "20" cai no balde "05" (restante do salário),
   // pois o modelo de saldo é binário (adiantamento dia 20 + restante dia 05).
@@ -1450,11 +1450,24 @@ function deleteExpense(mode){
   } else {
     if(!confirm('Excluir apenas este lançamento?')) return;
     const mk = editMonthKey || monthKey();
-    const deletes = ['vitoria','geo']
-      .filter(u=>(monthData[u]?.expenses||{})[id])
-      .map(u=>db.ref(`financas/${mk}/${u}/expenses/${id}`).remove());
-    Promise.all(deletes)
-      .then(()=>{ document.getElementById('modal-overlay').classList.remove('open'); showToast('🗑 Excluído!'); })
+    const owners = ['vitoria','geo'].filter(u=>(monthData[u]?.expenses||{})[id]);
+    const isFixedExp = owners.some(u=>monthData[u].expenses[id].isFixed);
+    let ops;
+    if(isFixedExp){
+      // Despesas fixas são recriadas automaticamente todo mês (ensureFixedMirrors).
+      // Remover o nó inteiro faria ela reaparecer sozinha assim que os dados
+      // sincronizassem de novo. Por isso, em vez de excluir, marcamos como
+      // "pulada" só neste mês — ela some da lista aqui, mas o molde continua
+      // ativo e volta a gerar normalmente no mês seguinte.
+      ops = owners.map(u=>db.ref(`financas/${mk}/${u}/expenses/${id}`).update({fixedSkipped:true}));
+    } else {
+      ops = owners.map(u=>db.ref(`financas/${mk}/${u}/expenses/${id}`).remove());
+    }
+    Promise.all(ops)
+      .then(()=>{
+        document.getElementById('modal-overlay').classList.remove('open');
+        showToast(isFixedExp ? '🗑 Removida só este mês (a fixa continua ativa)' : '🗑 Excluído!');
+      })
       .catch(()=>showToast('⚠️ Erro ao excluir'));
   }
 }
@@ -1830,11 +1843,15 @@ function toggleDespesaPaid(ev, cid, mk, did, cur) {
   updates[`cartoes/${cid}/faturas/${mk}/despesas/${did}/paid`] = !cur;
   const d = (cartoesData[cid]?.faturas?.[mk]?.despesas || {})[did];
   if (d) {
+    // O espelho na tela inicial vive no mês escolhido para reflexo (homeMk),
+    // que pode ser diferente do mês da própria fatura (mk) — por isso não dá
+    // pra usar `mk` aqui, senão o "pago" não bate com o card exibido em casa.
+    const homeMk = d.homeMk || d.vencMonth || mk;
     if (d.responsavel === 'vitoria' || d.responsavel === 'geo') {
-      updates[`financas/${mk}/${d.responsavel}/expenses/${did}/paid`] = !cur;
+      updates[`financas/${homeMk}/${d.responsavel}/expenses/${did}/paid`] = !cur;
     } else if (d.responsavel !== 'outros') {
-      updates[`financas/${mk}/vitoria/expenses/${did}/paid`] = !cur;
-      updates[`financas/${mk}/geo/expenses/${did}/paid`] = !cur;
+      updates[`financas/${homeMk}/vitoria/expenses/${did}/paid`] = !cur;
+      updates[`financas/${homeMk}/geo/expenses/${did}/paid`] = !cur;
     }
   }
   db.ref().update(updates).catch(() => showToast('⚠️ Erro ao atualizar'));
