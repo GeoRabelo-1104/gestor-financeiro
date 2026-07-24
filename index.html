@@ -163,6 +163,7 @@
   .expense-payment { font-size: 11px; color: var(--text3); margin-top: 2px; }
   .paid-badge { background: #e8f8f2; color: var(--success); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; }
   .unpaid-badge { background: #fff3e0; color: #f39c12; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; }
+  .fixed-badge { background: #f0effe; color: var(--primary); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; }
 
   .venc-separator { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
   .venc-label { font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
@@ -468,6 +469,54 @@
   </div>
 </div>
 
+<!-- Fixed Expense (template) Modal -->
+<div class="modal-overlay" id="fixa-modal" onclick="handleOverlayClick(event,'fixa-modal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="fixa-modal-title">🔁 Nova despesa fixa</div>
+    <form id="fixa-form" onsubmit="saveFixa(event)">
+      <input type="hidden" id="fixa-edit-id">
+      <div class="form-group">
+        <label class="form-label">Usuário</label>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="cat-btn" id="fbtn-vitoria" onclick="selectFixaUser('vitoria')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+            <span class="emoji">👩</span>Vitória
+          </button>
+          <button type="button" class="cat-btn" id="fbtn-geo" onclick="selectFixaUser('geo')" style="flex:1;display:flex;flex-direction:column;align-items:center">
+            <span class="emoji">👨</span>Geovanne
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <div class="cat-picker" id="fixa-cat-picker"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <input type="text" class="form-input" id="fixa-desc" placeholder="Ex: Água, Luz, Internet..." required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Valor reservado (R$)</label>
+          <input type="number" class="form-input" id="fixa-value" placeholder="Ex: 100,00" step="0.01" min="0.01" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vencimento</label>
+          <select class="form-select" id="fixa-venc">
+            <option value="20">Dia 20</option>
+            <option value="05">Dia 05</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin:-6px 0 14px">
+        💡 Esse valor entra automaticamente todo mês. Se não souber o valor exato, deixe uma estimativa — dá pra editar o valor de cada mês depois, na tela de lançamentos.
+      </div>
+      <button type="submit" class="btn-save" id="btn-save-fixa">💾 Salvar</button>
+      <button type="button" class="btn-delete" id="btn-delete-fixa" onclick="deleteFixa()" style="display:none">🗑 Excluir despesa fixa</button>
+    </form>
+  </div>
+</div>
+
 <!-- New Card Modal -->
 <div class="modal-overlay" id="new-cartao-modal" onclick="handleOverlayClick(event,'new-cartao-modal')">
   <div class="modal">
@@ -692,6 +741,7 @@ auth.onAuthStateChanged(user => {
       window.__appStarted = true;
       attachListener();
       attachCartoesListener();
+      attachFixasListener();
     }
   } else {
     appRoot.classList.add('login-hidden');
@@ -750,6 +800,15 @@ let monthData = null;
 let activeRef = null;
 let activeCallback = null;
 
+// Despesas fixas (templates recorrentes, ex: água, luz — valor pode ser
+// só uma estimativa reservada, e o valor real de cada mês pode ser editado
+// depois normalmente pela tela de lançamentos).
+let fixasData = {};
+let fixasRef = null;
+let fixasCallback = null;
+let selFixaCat = 'casa';
+let formFixaUser = 'vitoria';
+
 function monthKey(){ return `${state.year}_${MONTH_KEYS[state.month]}`; }
 function dbPath()  { return `financas/${monthKey()}`; }
 
@@ -778,6 +837,7 @@ function attachListener(){
       if(!monthData[u].expenses) monthData[u].expenses = {};
     });
     setSyncStatus('ok');
+    ensureFixedMirrors();
     // monthData é sempre atualizado (para já vir pronto ao trocar de tela),
     // mas só redesenha a tela inicial se ela estiver realmente visível.
     // Sem essa checagem, ao lançar uma despesa de cartão para Vitória/Geovanne/Casal
@@ -790,6 +850,42 @@ function attachListener(){
     setSyncStatus('error');
     showToast('⚠️ Erro de conexão com Firebase');
   });
+}
+
+// ─── DESPESAS FIXAS (templates recorrentes) ───────────────────────
+function attachFixasListener(){
+  if(fixasRef && fixasCallback) fixasRef.off('value', fixasCallback);
+  fixasRef = db.ref('fixas');
+  fixasCallback = function(snap){
+    fixasData = snap.val() || {};
+    ensureFixedMirrors();
+    if(currentScreen === 'home' && monthData) render();
+  };
+  fixasRef.on('value', fixasCallback);
+}
+
+// Garante que toda despesa fixa ativa tenha um lançamento espelhado no mês
+// em exibição, para o usuário responsável. Usa o próprio id do template
+// como id do lançamento, então é idempotente: se já existir (por já ter
+// sido criado ou editado nesse mês), não sobrescreve o valor/pago do usuário.
+function ensureFixedMirrors(){
+  if(!monthData || !fixasData) return;
+  const updates = {};
+  Object.values(fixasData).forEach(fx=>{
+    if(!fx || fx.active===false) return;
+    const owner = fx.owner;
+    if(owner!=='vitoria' && owner!=='geo') return;
+    const exists = (monthData[owner]?.expenses||{})[fx.id];
+    if(!exists){
+      updates[`financas/${monthKey()}/${owner}/expenses/${fx.id}`] = {
+        id: fx.id, _owner: owner, cat: fx.cat,
+        desc: fx.desc, value: fx.value, venc: fx.venc||'05',
+        payment:'', paid:false, parcelGroup:null,
+        isFixed:true, fixaId: fx.id
+      };
+    }
+  });
+  if(Object.keys(updates).length) db.ref().update(updates);
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────
@@ -924,6 +1020,30 @@ function render(){
     </div>
   </div>`;
 
+  // Despesas fixas (templates recorrentes do usuário atual)
+  const userFixas = Object.values(fixasData||{}).filter(fx=>fx && fx.owner===state.user);
+  h+=`<div class="section-header">
+    <div class="section-title">🔁 Despesas Fixas</div>
+    <button class="btn-add" onclick="openNewFixaModal()"><span style="font-size:20px;line-height:1">+</span> Nova</button>
+  </div>`;
+  if(!userFixas.length){
+    h+=`<div class="empty-state" style="padding:16px"><p style="font-size:13px">Nenhuma despesa fixa cadastrada.<br>Ex: água, luz, internet — com valor estimado que entra todo mês.</p></div>`;
+  } else {
+    h+=`<div class="expense-list" style="margin-bottom:16px">`;
+    userFixas.forEach(fx=>{
+      const cat=catById(fx.cat);
+      h+=`<div class="expense-item" onclick="openEditFixaModal('${fx.id}')">
+        <div class="cat-dot" style="background:${cat.color}20;color:${cat.color}">${cat.emoji}</div>
+        <div class="expense-info">
+          <div class="expense-desc">${escHtml(fx.desc||cat.label)}</div>
+          <div class="expense-meta"><span>${cat.label}</span><span class="fixed-badge">🔁 Todo mês</span><span>Venc. dia ${fx.venc||'05'}</span></div>
+        </div>
+        <div class="expense-right"><div class="expense-value">${fmt(fx.value)}</div><div class="expense-payment">estimado</div></div>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+
   // Category breakdown
   if(Object.keys(catTotals).length){
     h+=`<div class="section-header"><div class="section-title">📊 Por categoria</div></div><div class="cat-grid">`;
@@ -978,6 +1098,7 @@ function renderExpense(e){
       <div class="expense-meta">
         <span>${cat.label}</span>
         ${e.parcelGroup?`<span class="parcel">${e.parcelCur}/${e.parcelTotal}</span>`:''}
+        ${e.isFixed?'<span class="fixed-badge">🔁 Fixa</span>':''}
         ${e.paid?'<span class="paid-badge">Pago</span>':'<span class="unpaid-badge">A pagar</span>'}
       </div>
     </div>
@@ -1113,6 +1234,80 @@ function renderCdCatPicker(){
     </button>`).join('');
 }
 function selectCdCat(id){ selCdCat=id; renderCdCatPicker(); }
+
+// Picker de categoria e usuário reaproveitados no modal de despesa fixa
+function renderFixaCatPicker(){
+  document.getElementById('fixa-cat-picker').innerHTML=CATEGORIES.map(c=>
+    `<button type="button" class="cat-btn ${c.id===selFixaCat?'selected':''}" onclick="selectFixaCat('${c.id}')">
+      <span class="emoji">${c.emoji}</span>${c.label}
+    </button>`).join('');
+}
+function selectFixaCat(id){ selFixaCat=id; renderFixaCatPicker(); }
+function selectFixaUser(u){
+  formFixaUser=u;
+  ['vitoria','geo'].forEach(x=>{
+    document.getElementById('fbtn-'+x).className=`cat-btn${formFixaUser===x?' selected':''}`;
+    document.getElementById('fbtn-'+x).style.cssText='flex:1;display:flex;flex-direction:column;align-items:center';
+  });
+}
+
+function openNewFixaModal(){
+  formFixaUser=state.user;
+  document.getElementById('fixa-edit-id').value='';
+  document.getElementById('fixa-modal-title').textContent='🔁 Nova despesa fixa';
+  document.getElementById('fixa-form').reset();
+  document.getElementById('btn-delete-fixa').style.display='none';
+  document.getElementById('btn-save-fixa').disabled=false;
+  document.getElementById('btn-save-fixa').textContent='💾 Salvar';
+  selFixaCat='casa'; renderFixaCatPicker(); selectFixaUser(formFixaUser);
+  document.getElementById('fixa-modal').classList.add('open');
+}
+
+function openEditFixaModal(id){
+  const fx=fixasData[id];
+  if(!fx) return;
+  formFixaUser=fx.owner||state.user;
+  document.getElementById('fixa-edit-id').value=id;
+  document.getElementById('fixa-modal-title').textContent='✏️ Editar despesa fixa';
+  document.getElementById('fixa-desc').value=fx.desc||'';
+  document.getElementById('fixa-value').value=fx.value||'';
+  document.getElementById('fixa-venc').value=fx.venc||'05';
+  selFixaCat=fx.cat||'casa'; renderFixaCatPicker(); selectFixaUser(formFixaUser);
+  document.getElementById('btn-delete-fixa').style.display='block';
+  document.getElementById('btn-save-fixa').disabled=false;
+  document.getElementById('btn-save-fixa').textContent='💾 Salvar';
+  document.getElementById('fixa-modal').classList.add('open');
+}
+
+function saveFixa(ev){
+  ev.preventDefault();
+  const btn=document.getElementById('btn-save-fixa');
+  btn.disabled=true; btn.textContent='⏳ Salvando...';
+  const editId=document.getElementById('fixa-edit-id').value;
+  const id=editId||uid();
+  const fixa={
+    id, owner: formFixaUser, cat: selFixaCat,
+    desc: document.getElementById('fixa-desc').value.trim(),
+    value: parseFloat(document.getElementById('fixa-value').value)||0,
+    venc: document.getElementById('fixa-venc').value,
+    active: true
+  };
+  db.ref(`fixas/${id}`).set(fixa)
+    .then(()=>{
+      document.getElementById('fixa-modal').classList.remove('open');
+      showToast(editId ? '✅ Despesa fixa atualizada!' : '✅ Despesa fixa criada!');
+    })
+    .catch(err=>{ console.error(err); btn.disabled=false; btn.textContent='💾 Salvar'; showToast('⚠️ Erro ao salvar'); });
+}
+
+function deleteFixa(){
+  const id=document.getElementById('fixa-edit-id').value;
+  if(!id) return;
+  if(!confirm('Excluir esta despesa fixa?\nOs lançamentos já criados em meses anteriores continuarão existindo — apenas não será mais criada automaticamente em novos meses.')) return;
+  db.ref(`fixas/${id}`).remove()
+    .then(()=>{ document.getElementById('fixa-modal').classList.remove('open'); showToast('🗑 Despesa fixa excluída!'); })
+    .catch(()=>showToast('⚠️ Erro ao excluir'));
+}
 function selectFormUser(u){ formUser=u; updateUBtns(); }
 function updateUBtns(){
   ['vitoria','geo'].forEach(u=>{
